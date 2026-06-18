@@ -5,7 +5,7 @@ pbp as (
 ),
 
 games as (
-    select game_id, home_won from {{ ref('stg_games') }}
+    select game_id, game_date, season, home_won from {{ ref('stg_games') }}
 ),
 
 filled_scores as (
@@ -32,7 +32,11 @@ final as (
         f.game_id,
         f.action_number,
         f.period,
-        f.score_home_filled - f.score_away_filled  as score_diff,
+        -- Before the first basket there is no prior score to forward-fill, so
+        -- the filled value is null. The game is tied 0-0 at that point, so
+        -- coalesce to 0 rather than leaking a null into the model.
+        coalesce(f.score_home_filled, 0)
+            - coalesce(f.score_away_filled, 0)     as score_diff,
         case when f.period > 4 then 1 else 0 end   as is_overtime,
         -- Parse PT12M00.00S -> total regulation seconds remaining.
         -- OT plays have no meaningful "time left" in the model, so 0.
@@ -45,6 +49,8 @@ final as (
                 )
                 + (4 - f.period) * 720
         end                                        as seconds_remaining,
+        g.game_date,
+        g.season,
         g.home_won
     from filled_scores f
     inner join games g on f.game_id = g.game_id
