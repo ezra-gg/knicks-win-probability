@@ -20,11 +20,24 @@ ingest  ->  load  ->  ratings  ->  dbt build  ->  train
 | Transform | `just dbt build` | staging/intermediate/mart models + tests | ~3s |
 | Train | `just train` | `models/win_probability.pkl` | ~50s |
 
-After the first full ingest, the everyday refresh is the back four stages bundled:
+Three intent-based bundles cover the common cases:
 
 ```bash
-just pipeline      # load -> ratings -> dbt build -> train (assumes ingest is done)
+just full          # everything: ingest + load + ratings + dbt build + train
+just pipeline      # rebuild WITHOUT pulling data (after a code/feature/param change)
+just ingest        # pull data only (e.g. overnight; rebuild later with just pipeline)
 ```
+
+`just full` is the same command cold or warm: ingest is incremental, so a refresh
+only fetches new games and the fast downstream stages rebuild. For an overnight run
+on macOS, wrap it to stay awake and survive a closed terminal:
+
+```bash
+nohup caffeinate -i just full > run.log 2>&1 &
+```
+
+`caffeinate` stays out of the recipe on purpose (it is macOS-only); wrapping keeps
+`just full` portable.
 
 Quality gates, run anytime:
 
@@ -91,12 +104,14 @@ halts the run and nothing is saved.
 
 ## Refreshing for a new season
 
-1. `just ingest` - incremental, pulls only the new season's games.
-2. `just pipeline` - reloads, rebuilds ratings, rebuilds dbt models, retrains.
+```bash
+just full      # pulls only new games, then reloads, re-rates, rebuilds, retrains
+```
 
 The train/test split windows slide forward on their own (they are derived from
 the data, not hardcoded), so the newest season automatically becomes the holdout.
-Nothing to hand-edit.
+Nothing to hand-edit. Tunables, if you do want to change any, are all in
+`params.yml`.
 
 ## Re-running a single dbt model
 

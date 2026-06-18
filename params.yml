@@ -1,0 +1,32 @@
+# Single source of truth for tunable parameters.
+# Loaded by src/config.py; edit here rather than hunting through the code.
+
+# Elo team-strength ratings (src/build_team_ratings.py)
+elo:
+  base_rating: 1500   # anchor every team starts at; arbitrary, only gaps matter
+  k_factor: 20        # how far one game moves a rating (FiveThirtyEight's NBA value)
+
+# Win-probability model (src/train.py)
+model:
+  features:           # the inputs the model is allowed to see
+    - seconds_remaining
+    - score_diff
+    - is_overtime
+    - rating_diff
+  label: home_won
+
+  # Three-way time split. The actual seasons are derived from the data; these
+  # only set how many recent seasons go to each holdout window, so they slide
+  # forward automatically as new seasons arrive.
+  n_holdout: 2        # most recent seasons reserved for the honest final score
+  n_validation: 2     # seasons before that, used for early stopping
+
+  # XGBoost hyperparameters. n_estimators is a ceiling; early stopping picks
+  # the real tree count from the validation curve.
+  xgboost:
+    n_estimators: 2000
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    early_stopping_rounds: 50
