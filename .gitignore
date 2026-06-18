@@ -20,6 +20,11 @@ data/*.duckdb.wal
 # Trained model artifacts (optional; see README, we may commit a small final model)
 models/*.pkl
 
+# dbt build artifacts - regenerated on every run
+transform/target/
+transform/logs/
+transform/.user.yml
+
 # OS / editor cruft
 .DS_Store
 .vscode/
