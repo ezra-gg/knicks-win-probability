@@ -11,6 +11,7 @@ __pycache__/
 # Raw/large data - regenerate from source instead of committing
 data/raw/*.csv
 data/raw/*.parquet
+data/*.parquet
 
 # DuckDB database file - regenerable from the raw CSVs via src/load_duckdb.py
 data/*.duckdb
@@ -22,3 +23,6 @@ models/*.pkl
 # OS / editor cruft
 .DS_Store
 .vscode/
+
+# Personal learning notes - kept local, not part of the public portfolio
+docs/ml-lesson.md
