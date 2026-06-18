@@ -7,6 +7,14 @@ profile: knicks_win_probability
 model-paths: ["models"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
+seed-paths: ["seeds"]
+
+seeds:
+  knicks_win_probability:
+    franchise_map:
+      +column_types:
+        historical_tricode: varchar
+        current_tricode: varchar
 
 models:
   knicks_win_probability:

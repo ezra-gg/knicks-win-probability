@@ -17,6 +17,8 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+from config import PARAMS
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -28,14 +30,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
 DEFAULT_OUT_PATH = PROJECT_ROOT / "data" / "team_ratings.parquet"
 
-# Every team starts here. The absolute value is arbitrary, since Elo only ever
-# compares rating gaps, not absolute ratings. 1500 is just the conventional anchor.
-BASE_RATING = 1500.0
-# Max points one game can move a rating. 20 balances the NBA's long 82-game season
-# (more data per team argues for a lower, steadier value) against mid-season roster
-# changes (argues for a higher, more reactive one). Matches FiveThirtyEight's NBA
-# Elo. Worth tuning as a hyperparameter once we can measure prediction quality.
-K_FACTOR = 20.0
+# Tunables live in params.yml; see the comments there for what each one means.
+BASE_RATING = float(PARAMS["elo"]["base_rating"])
+K_FACTOR = float(PARAMS["elo"]["k_factor"])
 
 
 def update_elo(home_rating: float, away_rating: float, home_won: int) -> tuple[float, float]:

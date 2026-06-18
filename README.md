@@ -86,7 +86,8 @@ knicks-win-probability/
 ├── notebooks/     # exploratory analysis
 ├── app/           # Streamlit dashboard
 ├── models/        # trained model artifacts
-└── justfile       # task runner (just ingest / load / ratings / dbt / train / test)
+├── params.yml     # all tunables (Elo, model features, split windows, hyperparams)
+└── justfile       # task runner (just ingest / load / ratings / dbt / train / full)
 ```
 
 ## Notes

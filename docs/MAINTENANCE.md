@@ -17,6 +17,12 @@ the model should be measured against these:
 XGBoost early-stops around 196 trees. The sanity gate must stay green: tied at
 tip-off ~0.59, up 20 with 10s left ~0.99, down 3 with 5s left ~0.11.
 
+## Where configuration lives
+
+All tunables are in **`params.yml`** at the project root, loaded by `src/config.py`.
+One file for Elo settings, model features, the split windows, and XGBoost
+hyperparameters. Change values there, not in the code.
+
 ## Dependencies
 
 `requirements.txt` pins every direct dependency to the version tested against.
@@ -27,31 +33,37 @@ dependency and will not be captured by `requirements.txt`.
 
 ## Things that need a human when the league changes
 
-### Franchise relocations (`src/compare_ratings.py`, `CANON`)
+### Franchise relocations (`transform/seeds/franchise_map.csv`)
 
-The validation script folds relocated franchises onto their current tricode
+When a franchise relocates or rebrands, our Elo keeps the old tricode while the
+benchmarks use the new one. The map folds historical codes onto current ones
 (SEA->OKC, VAN->MEM, NJN->BKN, NOH/NOK->NOP) so all three rating sources share one
-key. If a team relocates or rebrands, add the mapping here. The Charlotte lineage
-is deliberately left unmapped, which costs two team-seasons in the comparison.
+key. It is a dbt seed - a plain CSV that is the single source of truth, read both
+by `compare_ratings.py` (directly) and by dbt (`just dbt seed`). To handle a new
+relocation, add one row to the CSV; no code change. The Charlotte lineage is
+deliberately left unmapped, which costs two team-seasons in the comparison.
 
-### Elo hyperparameters (`src/build_team_ratings.py`)
+(For full automation, `nba_api`'s `FranchiseHistory` endpoint exposes former
+cities, but relocations happen roughly once every four years, so a one-row CSV
+edit is simpler than maintaining a live derivation.)
 
-- `BASE_RATING = 1500` - the anchor everyone starts at. Arbitrary; only gaps matter.
-- `K_FACTOR = 20` - how far one game moves a rating. Matches FiveThirtyEight's NBA
-  Elo. Worth tuning as a hyperparameter once we can measure prediction quality, but
-  changing it shifts every rating, so re-run `just compare` afterward to confirm the
-  correlation with Net Rating and SRS still holds (~0.95).
+### Elo hyperparameters (`params.yml`, `elo:`)
+
+- `base_rating: 1500` - the anchor everyone starts at. Arbitrary; only gaps matter.
+- `k_factor: 20` - how far one game moves a rating. Matches FiveThirtyEight's NBA
+  Elo. Worth tuning once we can measure prediction quality, but changing it shifts
+  every rating, so re-run `just compare` afterward to confirm the correlation with
+  Net Rating and SRS still holds (~0.95).
 
 ## Things that take care of themselves
 
-### Train/test split windows (`src/train.py`)
+### Train/test split windows (`params.yml`, `model.n_holdout` / `n_validation`)
 
-`N_HOLDOUT` and `N_VALIDATION` define how many recent seasons go to holdout and
-validation. The actual seasons are derived from the data and slide forward as new
-ones arrive, so this does **not** need a yearly edit. Only change the constants if
-you want a different window size.
+These set how many recent seasons go to holdout and validation. The actual
+seasons are derived from the data and slide forward as new ones arrive, so this
+does **not** need a yearly edit. Only change them for a different window size.
 
-### Tree count (`src/train.py`)
+### Tree count (`params.yml`, `model.xgboost.n_estimators`)
 
 `n_estimators` is a ceiling, not a target. Early stopping picks the real count
 from the validation curve. If a run ever actually hits the ceiling, raise it - it

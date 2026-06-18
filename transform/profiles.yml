@@ -3,6 +3,8 @@ knicks_win_probability:
   outputs:
     dev:
       type: duckdb
-      # Set KNICKS_DB_PATH in your shell or let scripts/transform.sh set it.
-      path: "{{ env_var('KNICKS_DB_PATH') }}"
+      # The justfile sets KNICKS_DB_PATH (absolute) for CLI runs. The default
+      # below resolves the same DB relative to this project dir, so IDE dbt
+      # extensions that do not inherit the justfile's env still parse and run.
+      path: "{{ env_var('KNICKS_DB_PATH', '../data/nba.duckdb') }}"
       threads: 4
