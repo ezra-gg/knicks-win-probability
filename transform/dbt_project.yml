@@ -1,0 +1,16 @@
+name: knicks_win_probability
+version: "1.0.0"
+config-version: 2
+
+profile: knicks_win_probability
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+models:
+  knicks_win_probability:
+    staging:
+      +materialized: view      # thin wrappers, always fresh, no storage cost
+    mart:
+      +materialized: table     # persisted in DuckDB, queried by train.py

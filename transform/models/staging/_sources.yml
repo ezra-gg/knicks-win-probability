@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: nba
+    description: Raw NBA data loaded from nba_api CSVs by src/load_duckdb.py
+    schema: main
+    tables:
+      - name: games
+        description: One row per game with the final result (the model's label).
+        columns:
+          - name: game_id
+            tests: [unique, not_null]
+          - name: home_won
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [0, 1]
+
+      - name: play_by_play
+        description: Event-level stream - one row per play across all games.

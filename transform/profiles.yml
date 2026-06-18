@@ -1,0 +1,8 @@
+knicks_win_probability:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      # Set KNICKS_DB_PATH in your shell or let scripts/transform.sh set it.
+      path: "{{ env_var('KNICKS_DB_PATH') }}"
+      threads: 4
