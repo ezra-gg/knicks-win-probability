@@ -1,0 +1,20 @@
+# Python virtual environment — never commit; it's machine-specific and large
+.venv/
+
+# Python bytecode caches
+__pycache__/
+*.py[cod]
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Raw/large data — regenerate from source instead of committing
+data/raw/*.csv
+data/raw/*.parquet
+
+# Trained model artifacts (optional — see README; we may commit a small final model)
+models/*.pkl
+
+# OS / editor cruft
+.DS_Store
+.vscode/
