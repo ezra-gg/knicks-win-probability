@@ -23,3 +23,6 @@ models/*.pkl
 # OS / editor cruft
 .DS_Store
 .vscode/
+
+# Personal learning notes - kept local, not part of the public portfolio
+docs/ml-lesson.md
