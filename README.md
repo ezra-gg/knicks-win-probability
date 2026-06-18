@@ -5,6 +5,7 @@ interactive Streamlit app that lets you scrub through any game and watch the
 live probability curve. Knicks will always steal the spotlight though.
 
 > Ezra's first just-for-fun project.
+> Leveraging Claude Code to accelerate the development, but owning all key architecture and design decisions.
 
 ## How it works
 
