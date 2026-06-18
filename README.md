@@ -37,9 +37,14 @@ fetches what's new, so it's safe to interrupt and resume.
 
 - [x] Data ingestion (game index + play-by-play)
 - [x] Local DuckDB storage
-- [ ] Feature engineering
-- [ ] Model training and calibration
+- [x] Feature engineering (dbt: staging -> intermediate -> mart)
+- [x] Team strength ratings (Elo, validated against Net Rating and SRS)
+- [x] Model training and calibration (logistic baseline + XGBoost)
+- [ ] Player-aware team strength (see "Down the road")
 - [ ] Streamlit app
+
+See [docs/RUNBOOK.md](docs/RUNBOOK.md) to run the pipeline and
+[docs/MAINTENANCE.md](docs/MAINTENANCE.md) to keep it healthy.
 
 ## Down the road
 
@@ -58,24 +63,30 @@ A few directions I want to explore once the core model works:
 
 ## Tech stack
 
-| Layer           | Tool           |
-| --------------- | -------------- |
-| Data source     | `nba_api`      |
-| Storage         | `DuckDB`       |
-| Data processing | `pandas`       |
-| Modeling        | `scikit-learn` |
-| App             | `Streamlit`    |
+| Layer            | Tool                      |
+| ---------------- | ------------------------- |
+| Data source      | `nba_api`                 |
+| Storage          | `DuckDB`                  |
+| Transformation   | `dbt` (`dbt-duckdb`)      |
+| Data processing  | `pandas`                  |
+| Modeling         | `scikit-learn`, `XGBoost` |
+| Task running     | `just`                    |
+| App              | `Streamlit`               |
 
 ## Project layout
 
 ```
 knicks-win-probability/
-├── scripts/       # setup and run wrappers (setup.sh, ingest.sh, load.sh)
-├── src/           # ingestion, storage, model code
+├── scripts/       # setup and run wrappers (setup.sh, ingest.sh, load.sh, ...)
+├── src/           # ingestion, Elo ratings, validation, model training
+├── transform/     # dbt project (staging -> intermediate -> mart, + tests)
+├── tests/         # pytest unit tests
+├── docs/          # runbook and maintenance guide
 ├── data/          # raw CSVs and the DuckDB database (gitignored)
 ├── notebooks/     # exploratory analysis
 ├── app/           # Streamlit dashboard
-└── models/        # trained model artifacts
+├── models/        # trained model artifacts
+└── justfile       # task runner (just ingest / load / ratings / dbt / train / test)
 ```
 
 ## Notes
