@@ -15,7 +15,14 @@ lxml==5.3.0
 # Phase 2.5 - dbt transformation layer (replaces build_shots, build_player_team_seasons, features)
 dbt-duckdb==1.9.3
 
+# Phase 3 - modeling
+scikit-learn==1.6.1
+xgboost==2.1.4
+joblib==1.4.2
+
+# Testing & linting (also run in CI)
+pytest==8.3.4
+ruff==0.8.6
+
 # Later phases will add:
-#   scikit-learn   (Phase 3 - modeling)
-#   xgboost        (Phase 3 - modeling)
 #   streamlit      (Phase 4 - app)
