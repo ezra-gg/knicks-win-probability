@@ -6,6 +6,12 @@ nba_api==1.11.4
 pandas==3.0.3
 duckdb==1.5.4
 
+# Phase 2 - feature engineering
+pyarrow==20.0.0
+
+# Validation - parsing Basketball-Reference HTML tables for the ratings comparison
+lxml==5.3.0
+
 # Later phases will add:
 #   scikit-learn   (Phase 3 - modeling)
 #   xgboost        (Phase 3 - modeling)
