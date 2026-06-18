@@ -1,4 +1,4 @@
-# Python virtual environment — never commit; it's machine-specific and large
+# Python virtual environment. Never commit; it's machine-specific and large
 .venv/
 
 # Python bytecode caches
@@ -8,11 +8,15 @@ __pycache__/
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
-# Raw/large data — regenerate from source instead of committing
+# Raw/large data - regenerate from source instead of committing
 data/raw/*.csv
 data/raw/*.parquet
 
-# Trained model artifacts (optional — see README; we may commit a small final model)
+# DuckDB database file - regenerable from the raw CSVs via src/load_duckdb.py
+data/*.duckdb
+data/*.duckdb.wal
+
+# Trained model artifacts (optional; see README, we may commit a small final model)
 models/*.pkl
 
 # OS / editor cruft
