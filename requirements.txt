@@ -1,0 +1,12 @@
+# Direct dependencies only. Transitive deps (numpy, requests, etc.) are resolved automatically by pip. 
+# We don't pin them here to keep this file readable. Versions are pinned to what we tested against.
+#
+# Phase 1 - data ingestion & local storage
+nba_api==1.11.4
+pandas==3.0.3
+duckdb==1.5.4
+
+# Later phases will add:
+#   scikit-learn   (Phase 3 - modeling)
+#   xgboost        (Phase 3 - modeling)
+#   streamlit      (Phase 4 - app)
