@@ -40,6 +40,21 @@ fetches what's new, so it's safe to interrupt and resume.
 - [ ] Model training and calibration
 - [ ] Streamlit app
 
+## Down the road
+
+A few directions I want to explore once the core model works:
+
+- **Player-aware team strength.** Right now team strength is a single Elo rating
+  per franchise, which means it can't tell that a roster changed. If a star gets
+  traded over the summer, the old team is still rated as if he never left. The plan
+  is to map players to teams over time, weight them by playing time, and build team
+  strength as the sum of the current roster's value instead of one franchise number.
+- **Smarter season transitions.** Regress team ratings toward the mean between
+  seasons, ideally weighted by how much of the roster actually returned, so a gutted
+  team drops and a team that kept its core does not.
+- **Provisional ratings.** A faster-moving rating early in a team's history to cut
+  down on cold-start noise in the earliest seasons.
+
 ## Tech stack
 
 | Layer           | Tool           |
