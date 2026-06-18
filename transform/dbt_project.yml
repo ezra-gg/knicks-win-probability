@@ -12,5 +12,7 @@ models:
   knicks_win_probability:
     staging:
       +materialized: view      # thin wrappers, always fresh, no storage cost
+    intermediate:
+      +materialized: view      # reusable building blocks, recomputed on demand
     mart:
       +materialized: table     # persisted in DuckDB, queried by train.py

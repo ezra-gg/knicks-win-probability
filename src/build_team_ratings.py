@@ -116,6 +116,18 @@ def main() -> None:
     log.info("Writing %d rows to %s...", len(ratings), args.out)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     ratings.to_parquet(args.out, index=False)
+
+    # Persist to DuckDB too, so dbt can join it as a source. Elo is a sequential
+    # loop and stays in Python, but its output is a normal table dbt builds on.
+    # Reopen read-write (the load above used a read-only connection).
+    con_rw = duckdb.connect(str(args.db_path))
+    try:
+        con_rw.register("ratings_df", ratings)
+        con_rw.execute("CREATE OR REPLACE TABLE team_ratings AS SELECT * FROM ratings_df")
+        log.info("Wrote team_ratings table to %s.", args.db_path)
+    finally:
+        con_rw.close()
+
     log.info("Done.")
 
     print(f"\nRatings shape: {ratings.shape}")

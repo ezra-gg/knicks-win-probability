@@ -22,6 +22,8 @@ models:
         tests: [not_null]
       - name: seconds_remaining
         tests: [not_null]
+      - name: score_diff
+        tests: [not_null]
 
   - name: shots
     description: Field goal attempts with location, result, and game context.

@@ -19,3 +19,14 @@ sources:
 
       - name: play_by_play
         description: Event-level stream - one row per play across all games.
+
+      - name: team_ratings
+        description: >
+          Pre-game Elo rating per team per game, written by src/build_team_ratings.py.
+          Elo is a sequential update loop so it stays in Python; this table is its
+          output, joined into the model input by dbt.
+        columns:
+          - name: game_id
+            tests: [unique, not_null]
+          - name: rating_diff
+            tests: [not_null]
