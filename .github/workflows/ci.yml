@@ -22,4 +22,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install dbt-duckdb==1.9.3
-      - run: KNICKS_DB_PATH=dummy cd transform && dbt parse --profiles-dir .
+      - name: Parse dbt project
+        working-directory: transform
+        env:
+          KNICKS_DB_PATH: dummy
+          DBT_PROFILES_DIR: .
+        run: dbt parse
