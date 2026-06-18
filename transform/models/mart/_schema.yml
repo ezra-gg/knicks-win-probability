@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: features
+    description: Play-by-play features ready for model training, one row per event.
+    columns:
+      - name: game_id
+        tests: [not_null]
+      - name: home_won
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: is_overtime
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: period
+        tests: [not_null]
+      - name: seconds_remaining
+        tests: [not_null]
+
+  - name: shots
+    description: Field goal attempts with location, result, and game context.
+    columns:
+      - name: game_id
+        tests: [not_null]
+      - name: person_id
+        tests: [not_null]
+      - name: made
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: shot_value
+        tests:
+          - accepted_values:
+              arguments:
+                values: [2, 3]
+      - name: seconds_remaining
+        tests: [not_null]
+
+  - name: player_team_seasons
+    description: Player involvement by team and season, one row per player/team/season.
+    columns:
+      - name: person_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: games
+        tests: [not_null]
+      - name: fga
+        tests: [not_null]
+      - name: fgm
+        tests: [not_null]
