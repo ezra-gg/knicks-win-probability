@@ -22,6 +22,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, log_loss
 from xgboost import XGBClassifier
 
+from config import PARAMS
+
 # Either model satisfies the same interface we use (predict_proba), so the
 # evaluation and sanity-check helpers accept both.
 Model = LogisticRegression | XGBClassifier
@@ -37,19 +39,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.pkl"
 
-# The four inputs the model is allowed to see. game_id/date/season are
+# All tunables live in params.yml (see comments there). game_id/date/season are
 # bookkeeping for the split and never go into X.
-FEATURES = ["seconds_remaining", "score_diff", "is_overtime", "rating_diff"]
-LABEL = "home_won"
+FEATURES = PARAMS["model"]["features"]
+LABEL = PARAMS["model"]["label"]
 
-# The split windows are derived from the data, not hardcoded, so they slide
-# forward on their own as new seasons are ingested - no yearly hand-edit, and
-# no risk of silently training on what should be the test set.
-#   - holdout:    the most recent N_HOLDOUT seasons, the honest final score.
-#   - validation: the N_VALIDATION seasons just before, for early stopping.
-# Both sit at the recent end so they best resemble the future we predict.
-N_HOLDOUT = 2
-N_VALIDATION = 2
+# Split windows are derived from the data, not hardcoded, so they slide forward
+# on their own as new seasons arrive. These only set how many recent seasons go
+# to each window: holdout is the most recent N_HOLDOUT (the honest final score),
+# validation the N_VALIDATION before that (for early stopping).
+N_HOLDOUT = PARAMS["model"]["n_holdout"]
+N_VALIDATION = PARAMS["model"]["n_validation"]
 
 
 def load_model_input(db_path: Path) -> pd.DataFrame:
@@ -117,15 +117,12 @@ def fit_xgboost(fit_df: pd.DataFrame, val_df: pd.DataFrame) -> XGBClassifier:
     X_val, y_val = val_df[FEATURES], val_df[LABEL]
     log.info("Fitting XGBoost on %d rows (early stopping on %d val rows) ...",
              len(X_fit), len(X_val))
+    # Tunables (n_estimators, depth, learning rate, ...) come from params.yml.
+    # The fixed infrastructure flags below are not tuning knobs, so they stay here.
     model = XGBClassifier(
-        n_estimators=2000,           # ceiling; early stopping usually halts well before
-        max_depth=6,                 # how many interactions a single tree can stack
-        learning_rate=0.05,          # shrinks each tree's contribution; lower = steadier
-        subsample=0.8,               # row sampling per tree, guards against overfitting
-        colsample_bytree=0.8,        # feature sampling per tree, same idea
+        **PARAMS["model"]["xgboost"],
         tree_method="hist",          # bins features for speed on millions of rows
         eval_metric="logloss",       # the metric early stopping watches
-        early_stopping_rounds=50,    # stop if val log loss stalls for 50 rounds
         n_jobs=-1,                   # use all cores
     )
     model.fit(X_fit, y_fit, eval_set=[(X_val, y_val)], verbose=False)

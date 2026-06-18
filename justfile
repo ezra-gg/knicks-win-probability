@@ -54,7 +54,16 @@ lint *args:
 rebuild: load
     just dbt build
 
-# End to end: load, rebuild Elo, build + test dbt models, train the model
+# Rebuild everything WITHOUT pulling new data: load, Elo, dbt build, train.
+# Use after a code/feature/param change, or once an overnight ingest is done.
 pipeline: load ratings
     just dbt build
     just train
+
+# Everything end to end including the data pull. Same command cold or warm:
+# ingest is incremental, so a refresh only fetches new games. For an overnight
+# run on macOS, wrap it to stay awake and survive a closed terminal:
+#   nohup caffeinate -i just full > run.log 2>&1 &
+full:
+    just ingest
+    just pipeline

@@ -6,6 +6,9 @@ nba_api==1.11.4
 pandas==3.0.3
 duckdb==1.5.4
 
+# Config (params.yml)
+PyYAML==6.0.2
+
 # Phase 2 - feature engineering
 pyarrow==20.0.0
 

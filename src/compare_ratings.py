@@ -48,8 +48,12 @@ NBA_SLEEP = 0.6   # be gentle, the ingest may also be hitting stats.nba.com
 BREF_SLEEP = 3.0  # Basketball-Reference asks for slow, polite scraping
 
 # Our Elo uses the abbreviation as it was at the time. Fold relocated franchises
-# onto their current code so all three sources share one canonical key.
-CANON = {"SEA": "OKC", "VAN": "MEM", "NJN": "BKN", "NOH": "NOP", "NOK": "NOP"}
+# onto their current code so all three sources share one canonical key. The map
+# lives in a dbt seed (transform/seeds/franchise_map.csv) so it is the single
+# source of truth, editable without touching code; we read that CSV directly.
+FRANCHISE_MAP_CSV = PROJECT_ROOT / "transform" / "seeds" / "franchise_map.csv"
+_franchise_map = pd.read_csv(FRANCHISE_MAP_CSV)
+CANON = dict(zip(_franchise_map["historical_tricode"], _franchise_map["current_tricode"]))
 
 # Build name/id lookups from nba_api's static list, then add the names
 # Basketball-Reference uses that the static list does not match.
