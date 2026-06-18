@@ -146,6 +146,19 @@ def pull_play_by_play(
         log.info("Nothing new to fetch.")
         return
 
+    # Warn early so the user can decide to abort. The ~1.0s accounts for the
+    # API round-trip itself on top of the polite sleep between requests.
+    estimated_seconds = len(todo) * (sleep + 1.0)
+    if estimated_seconds > 300:
+        hours, remainder = divmod(int(estimated_seconds), 3600)
+        minutes = remainder // 60
+        duration = f"{hours}h {minutes}m" if hours else f"{minutes}m"
+        log.warning(
+            "Large pull: %d games will take roughly %s. "
+            "Run under nohup or caffeinate -i to prevent interruption.",
+            len(todo), duration,
+        )
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     buffer: list[pd.DataFrame] = []
     file_has_header = out_path.exists()  # write header only when creating the file
