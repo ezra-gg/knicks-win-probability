@@ -42,6 +42,10 @@ train *args:
 predict *args:
     {{py}} src/predict.py {{args}}
 
+# Launch the Streamlit showcase app
+app *args:
+    {{py}} -m streamlit run app/streamlit_app.py {{args}}
+
 # --- quality ---
 
 # Run Python unit tests (pytest)

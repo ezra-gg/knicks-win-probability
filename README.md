@@ -40,15 +40,22 @@ fetches what's new, so it's safe to interrupt and resume.
 - [x] Feature engineering (dbt: staging -> intermediate -> mart)
 - [x] Team strength ratings (Elo, validated against Net Rating and SRS)
 - [x] Model training and calibration (logistic baseline + XGBoost)
+- [x] Matchup predictor + Streamlit app (game replay + matchup calculator)
+- [ ] Live game listener (stream an in-progress game, update the curve in real time)
 - [ ] Player-aware team strength (see "Down the road")
-- [ ] Streamlit app
 
 See [docs/RUNBOOK.md](docs/RUNBOOK.md) to run the pipeline and
 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) to keep it healthy.
 
 ## Down the road
 
-A few directions I want to explore now that the core model works:
+**Next up: a live game listener.** Poll an in-progress game from the NBA's live
+play-by-play feed, track the clock and score, and update the win-probability curve
+in real time - turning the game-replay view into a live scoreboard. The
+`MatchupPredictor` is already built to be called once per update; the listener is
+the piece that feeds it live state.
+
+A few further directions I want to explore now that the core model works:
 
 - **Roster-aware season transitions (in progress).** Instead of carrying a team's
   Elo into the next season unchanged, regress it toward the mean by how much of the

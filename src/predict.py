@@ -11,12 +11,13 @@ history; this consumes the saved artifact for a single named matchup.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from pathlib import Path
 
 import duckdb
-import joblib
 import pandas as pd
+from xgboost import XGBClassifier
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,10 +27,59 @@ logging.basicConfig(
 log = logging.getLogger("predict")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.pkl"
+DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
 
 REGULATION_SECONDS = 2880  # 4 x 12-minute quarters
+
+
+def features_path(model_path: Path) -> Path:
+    """Sidecar holding the feature order, next to the model file."""
+    return model_path.with_name(model_path.stem + "_features.json")
+
+
+def load_model(model_path: Path = DEFAULT_MODEL_PATH) -> tuple[XGBClassifier, list[str]]:
+    """Load the XGBoost model (native JSON, safe to share) and its feature order.
+
+    XGBoost's own format is data-only - no arbitrary code runs on load, unlike
+    pickle/joblib - and it is stable across library versions.
+    """
+    model = XGBClassifier()
+    model.load_model(str(model_path))
+    features = json.loads(features_path(model_path).read_text())["features"]
+    return model, features
+
+
+def save_model(model: XGBClassifier, features: list[str], model_path: Path = DEFAULT_MODEL_PATH) -> None:
+    """Persist the model in XGBoost's native format plus the feature sidecar."""
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    model.save_model(str(model_path))
+    features_path(model_path).write_text(json.dumps({"features": features}, indent=2))
+
+
+def game_state_seconds(period: int, clock_seconds: float) -> tuple[float, int]:
+    """Convert a period and clock-left-in-period to (seconds_remaining, is_overtime).
+
+    Mirrors the features model: in regulation, seconds_remaining sums this period's
+    clock and the full quarters after it; in OT it is just the period's own clock.
+    period 1-4 = regulation, 5+ = overtime.
+    """
+    if period <= 4:
+        return clock_seconds + (4 - period) * 720, 0
+    return clock_seconds, 1
+
+
+def endgame_certainty(seconds_remaining: float, score_diff: int) -> float | None:
+    """Deterministic win prob when the game is decided, else None.
+
+    seconds_remaining == 0 only occurs at the end of Q4 or an OT (regulation sums
+    the remaining quarters, so end of Q1-Q3 is never 0). At such a moment a
+    non-zero margin means the game is over - the leader won. A tie defers to the
+    model, since it is headed to another overtime.
+    """
+    if seconds_remaining <= 0 and score_diff != 0:
+        return 1.0 if score_diff > 0 else 0.0
+    return None
 
 
 def load_current_ratings(db_path: Path) -> dict[str, float]:
@@ -59,9 +109,7 @@ class MatchupPredictor:
     """Holds the model and current ratings; predicts for any matchup + state."""
 
     def __init__(self, model_path: Path = DEFAULT_MODEL_PATH, db_path: Path = DEFAULT_DB_PATH):
-        bundle = joblib.load(model_path)
-        self.model = bundle["model"]
-        self.features = bundle["features"]   # column order the model expects
+        self.model, self.features = load_model(model_path)
         self.ratings = load_current_ratings(db_path)
 
     def win_probability(self, home_team: str, away_team: str,
@@ -71,6 +119,10 @@ class MatchupPredictor:
         for team in (home_team, away_team):
             if team not in self.ratings:
                 raise KeyError(f"Unknown team '{team}'. Known: {sorted(self.ratings)}")
+
+        decided = endgame_certainty(seconds_remaining, score_diff)
+        if decided is not None:
+            return decided
 
         # The two teams enter the model only through their Elo gap.
         rating_diff = self.ratings[home_team] - self.ratings[away_team]
