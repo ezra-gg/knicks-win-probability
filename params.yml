@@ -5,6 +5,9 @@
 elo:
   base_rating: 1500   # anchor every team starts at; arbitrary, only gaps matter
   k_factor: 20        # how far one game moves a rating (FiveThirtyEight's NBA value)
+  # Between seasons, regress each team toward the mean by roster turnover
+  # (1 - continuity). Toggle for A/B-ing the roster-aware transition.
+  regress_between_seasons: true
 
 # Win-probability model (src/train.py)
 model:

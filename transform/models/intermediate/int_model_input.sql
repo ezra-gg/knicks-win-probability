@@ -12,6 +12,7 @@ ratings as (
 
 select
     f.game_id,
+    f.action_number,
     f.game_date,
     f.season,
     f.period,
