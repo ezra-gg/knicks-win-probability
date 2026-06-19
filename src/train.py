@@ -156,7 +156,7 @@ def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float,
 
 
 def win_prob(model: Model, seconds_remaining: float, score_diff: float,
-             is_overtime: int, rating_diff: float) -> float:
+             is_overtime: int, rating_diff: float, is_playoff: int = 0) -> float:
     """Predict P(home win) for a single hand-built game state.
 
     Built by feature name and reindexed to FEATURES, so it stays correct
@@ -166,6 +166,7 @@ def win_prob(model: Model, seconds_remaining: float, score_diff: float,
         "seconds_remaining": seconds_remaining,
         "score_diff": score_diff,
         "is_overtime": is_overtime,
+        "is_playoff": is_playoff,
         "rating_diff": rating_diff,
     }])[FEATURES]
     return float(model.predict_proba(state)[:, 1][0])
@@ -220,19 +221,26 @@ def main() -> None:
     # First quarter = seconds_remaining >= 2160 (2880 total minus one 720s quarter).
     first_q = holdout_df[holdout_df["seconds_remaining"] >= 2160]
 
+    reg_holdout    = holdout_df[holdout_df["is_playoff"] == 0]
+    playoff_holdout = holdout_df[holdout_df["is_playoff"] == 1]
+
     log.info("=== Logistic Regression (baseline) ===")
     baseline = fit_baseline(train_df)
     evaluate(baseline, holdout_df, base_rate, "full holdout")
     evaluate(baseline, first_q, base_rate, "first quarter")
+    evaluate(baseline, reg_holdout, base_rate, "regular season only")
+    evaluate(baseline, playoff_holdout, base_rate, "playoffs only")
 
     log.info("=== XGBoost ===")
     # Carve a validation set out of train_df for early stopping. Same split
-    # function as the holdout - "hold out these seasons" is the same operation
+    # function as the holdout - "held out these seasons" is the same operation
     # whether the held-out part is the final test or the early-stopping set.
     fit_df, val_df = split_by_time(train_df, validation_seasons)
     xgb = fit_xgboost(fit_df, val_df)
     evaluate(xgb, holdout_df, base_rate, "full holdout")
     evaluate(xgb, first_q, base_rate, "first quarter")
+    evaluate(xgb, reg_holdout, base_rate, "regular season only")
+    evaluate(xgb, playoff_holdout, base_rate, "playoffs only")
 
     # Run the basketball sanity gate on the production candidate. Only a model
     # that clears it gets saved - the asserts halt the run otherwise.

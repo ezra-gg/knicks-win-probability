@@ -84,6 +84,7 @@ def get_game_index(seasons: list[str], season_type: str = "Regular Season") -> p
                 "game_id": str(game_id),
                 "game_date": home["GAME_DATE"],
                 "season": season,
+                "season_type": season_type,  # "Regular Season" or "Playoffs"
                 "home_abbr": home["TEAM_ABBREVIATION"],
                 "away_abbr": away["TEAM_ABBREVIATION"],
                 "home_pts": int(home["PTS"]),
@@ -203,8 +204,9 @@ def main() -> None:
         "--start-season", default="2023-24",
         help="Earliest season when --seasons is not given (default: 2023-24).")
     parser.add_argument(
-        "--season-type", default="Regular Season",
-        choices=["Regular Season", "Playoffs", "Pre Season", "All Star"])
+        "--season-types", nargs="+", default=["Regular Season", "Playoffs"],
+        choices=["Regular Season", "Playoffs", "Pre Season", "All Star"],
+        help="Season types to ingest (default: Regular Season + Playoffs).")
     parser.add_argument(
         "--max-games", type=int, default=None,
         help="Cap games fetched for play-by-play (default: all). Handy for testing.")
@@ -224,13 +226,15 @@ def main() -> None:
 
     # Explicit --seasons wins; otherwise pull start-season through current.
     seasons = args.seasons or season_range(args.start_season, current_season())
-    log.info("Seasons: %s", ", ".join(seasons))
+    log.info("Seasons: %s | types: %s", ", ".join(seasons), ", ".join(args.season_types))
 
-    # Step 1: game index (one cheap request per season).
-    games = get_game_index(seasons, args.season_type)
+    # Step 1: game index, across all requested season types (cheap; one request
+    # per season per type). Regular season and playoffs share the same schema.
+    frames = [get_game_index(seasons, st) for st in args.season_types]
+    games = pd.concat(frames, ignore_index=True).sort_values("game_date").reset_index(drop=True)
     games_path = args.out_dir / "games.csv"
     games.to_csv(games_path, index=False)
-    log.info("Wrote game index -> %s", games_path)
+    log.info("Wrote game index (%d games) -> %s", len(games), games_path)
 
     if args.skip_pbp:
         return
