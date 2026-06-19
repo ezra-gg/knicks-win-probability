@@ -1,0 +1,8 @@
+{
+  "features": [
+    "seconds_remaining",
+    "score_diff",
+    "is_overtime",
+    "rating_diff"
+  ]
+}

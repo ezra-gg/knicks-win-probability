@@ -15,9 +15,22 @@ and feed a calibrated classifier. Given the score, time remaining, and period
 at any point in a game, the model estimates each team's chance of winning, and
 the Streamlit app replays that estimate across the whole game.
 
-## Quickstart
+## Try the app
 
-Requires Python 3.12+.
+The trained model and a compact data slice are committed, so the Streamlit app
+runs straight from a clone - no data pull, no training:
+
+```bash
+pip install -r app/requirements.txt
+just app          # or: streamlit run app/streamlit_app.py
+```
+
+It opens two views: a **game replay** (the win-probability curve through any
+recent game) and a **matchup calculator** (any two teams at any game state).
+
+## Rebuild from scratch
+
+Requires Python 3.12+. To regenerate everything from source:
 
 ```bash
 # 1. Set up the virtual environment and install dependencies
@@ -26,8 +39,8 @@ Requires Python 3.12+.
 # 2. Pull data (game index + play-by-play) through the current season
 ./scripts/ingest.sh --start-season 2023-24
 
-# 3. Load the raw CSVs into DuckDB
-./scripts/load.sh
+# 3. Load, build, rate, train, and export serving artifacts
+just pipeline
 ```
 
 Re-running `ingest.sh` is incremental. It skips games already on disk and only

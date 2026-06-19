@@ -42,6 +42,10 @@ train *args:
 predict *args:
     {{py}} src/predict.py {{args}}
 
+# Export the compact serving artifacts the app reads (decoupled from DuckDB)
+export:
+    {{py}} src/export_serving_data.py
+
 # Launch the Streamlit showcase app
 app *args:
     {{py}} -m streamlit run app/streamlit_app.py {{args}}
@@ -73,6 +77,7 @@ pipeline: load
     just ratings
     just dbt build
     just train
+    just export
 
 # Everything end to end including the data pull. Same command cold or warm:
 # ingest is incremental, so a refresh only fetches new games. For an overnight

@@ -15,7 +15,6 @@ import json
 import logging
 from pathlib import Path
 
-import duckdb
 import pandas as pd
 from xgboost import XGBClassifier
 
@@ -28,7 +27,8 @@ log = logging.getLogger("predict")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
-DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
+# Serving reads the committed ratings export, not the full DuckDB.
+DEFAULT_RATINGS_PATH = PROJECT_ROOT / "data" / "serving" / "current_ratings.parquet"
 
 REGULATION_SECONDS = 2880  # 4 x 12-minute quarters
 
@@ -82,35 +82,23 @@ def endgame_certainty(seconds_remaining: float, score_diff: int) -> float | None
     return None
 
 
-def load_current_ratings(db_path: Path) -> dict[str, float]:
-    """Each team's most recent pre-game Elo, keyed by tricode.
+def load_current_ratings(ratings_path: Path = DEFAULT_RATINGS_PATH) -> dict[str, float]:
+    """Each team's current Elo, keyed by tricode, from the committed export.
 
-    team_ratings stores the rating a team carried *into* every game it played,
-    so the latest one (by date) is the best current estimate of its strength.
+    Built by src/export_serving_data.py (latest pre-game rating per team), so
+    serving needs only this small file - not the full DuckDB.
     """
-    con = duckdb.connect(str(db_path), read_only=True)
-    try:
-        df = con.execute("""
-            with stacked as (
-                select game_date, home_abbr as team, home_rating_pre as rating from team_ratings
-                union all
-                select game_date, away_abbr as team, away_rating_pre as rating from team_ratings
-            )
-            select team, arg_max(rating, game_date) as rating
-            from stacked
-            group by team
-        """).df()
-    finally:
-        con.close()
+    df = pd.read_parquet(ratings_path)
     return dict(zip(df["team"], df["rating"]))
 
 
 class MatchupPredictor:
     """Holds the model and current ratings; predicts for any matchup + state."""
 
-    def __init__(self, model_path: Path = DEFAULT_MODEL_PATH, db_path: Path = DEFAULT_DB_PATH):
+    def __init__(self, model_path: Path = DEFAULT_MODEL_PATH,
+                 ratings_path: Path = DEFAULT_RATINGS_PATH):
         self.model, self.features = load_model(model_path)
-        self.ratings = load_current_ratings(db_path)
+        self.ratings = load_current_ratings(ratings_path)
 
     def win_probability(self, home_team: str, away_team: str,
                         seconds_remaining: float = REGULATION_SECONDS,
@@ -144,10 +132,10 @@ def main() -> None:
     parser.add_argument("--margin", type=int, default=0,
                         help="home score minus away score right now (default: 0)")
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
-    parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
+    parser.add_argument("--ratings", type=Path, default=DEFAULT_RATINGS_PATH)
     args = parser.parse_args()
 
-    predictor = MatchupPredictor(args.model, args.db_path)
+    predictor = MatchupPredictor(args.model, args.ratings)
     p = predictor.win_probability(args.home, args.away,
                                   seconds_remaining=args.seconds, score_diff=args.margin)
 
