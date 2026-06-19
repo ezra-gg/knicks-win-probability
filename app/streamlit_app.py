@@ -191,7 +191,7 @@ with overview_tab:
     ))
     fig.add_vline(x=0.5, line_dash="dot", line_color="gray")
     fig.update_layout(
-        xaxis=dict(title=f"P({name(team)} win, {court.lower()})",
+        xaxis=dict(title=f"Percent Chance {name(team)} Win ({court})",
                    range=[0, 1], tickformat=".0%"),
         height=max(440, 20 * len(field)), margin=dict(t=30, l=10),
     )
