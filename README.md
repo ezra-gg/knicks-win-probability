@@ -17,17 +17,18 @@ the Streamlit app replays that estimate across the whole game.
 
 ## Try the app
 
-The trained model and a compact data slice are committed, so the Streamlit app
-runs straight from a clone - no data pull, no training:
+**[ezra-nba-probability.streamlit.app](https://ezra-nba-probability.streamlit.app/)** - no install needed.
+
+Three views: an **overview** (one team's tip-off odds against the whole league),
+a **matchup drill-down** (any two teams at any game state), and a **game replay**
+(the win-probability curve through any historical game).
+
+To run locally instead:
 
 ```bash
 pip install -r app/requirements.txt
-just app          # or: streamlit run app/streamlit_app.py
+streamlit run app/streamlit_app.py
 ```
-
-It opens three views: an **overview** (one team's tip-off odds against the whole
-league), a **matchup drill-down** (any two teams at any game state), and a
-**game replay** (the win-probability curve through any historical game).
 
 ## Rebuild from scratch
 
