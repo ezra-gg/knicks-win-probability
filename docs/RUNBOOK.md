@@ -8,8 +8,8 @@ decisions, see the README. For long-term stewardship, see [MAINTENANCE.md](MAINT
 Five stages, run in order. Each consumes the previous stage's output.
 
 ```
-ingest  ->  load  ->  ratings  ->  dbt build  ->  train
-(nba_api)  (DuckDB)   (Elo)        (features)     (model)
+ingest  ->  load  ->  ratings  ->  dbt build  ->  train  ->  export
+(nba_api)  (DuckDB)   (Elo)        (features)     (model)    (serving artifacts)
 ```
 
 | Stage | Command | Produces | Rough time |
@@ -18,7 +18,8 @@ ingest  ->  load  ->  ratings  ->  dbt build  ->  train
 | Load | `just load` | tables in `data/nba.duckdb` | seconds |
 | Ratings | `just ratings` | `data/team_ratings.parquet` + `team_ratings` table | seconds |
 | Transform | `just dbt build` | staging/intermediate/mart models + tests | ~3s |
-| Train | `just train` | `models/win_probability.pkl` | ~50s |
+| Train | `just train` | `models/win_probability.json` | ~50s |
+| Export | `just export` | `data/serving/` parquets (committed; the app reads these) | seconds |
 
 Three intent-based bundles cover the common cases:
 
