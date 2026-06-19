@@ -38,10 +38,14 @@ final as (
         coalesce(f.score_home_filled, 0)
             - coalesce(f.score_away_filled, 0)     as score_diff,
         case when f.period > 4 then 1 else 0 end   as is_overtime,
-        -- Parse PT12M00.00S -> total regulation seconds remaining.
-        -- OT plays have no meaningful "time left" in the model, so 0.
+        -- Parse PT12M00.00S into seconds left in the game. In regulation that is
+        -- this period's clock plus the full quarters after it. In OT it is just
+        -- the OT clock (each OT is its own 5-minute period that can end the game);
+        -- is_overtime tells the model which regime a small value belongs to.
         case
-            when f.period > 4 then 0.0
+            when f.period > 4 then
+                cast(regexp_extract(f.clock, 'PT(\d+)M', 1) as integer) * 60
+                + cast(regexp_extract(f.clock, 'M([\d.]+)S', 1) as double)
             else
                 (
                     cast(regexp_extract(f.clock, 'PT(\d+)M', 1) as integer) * 60
