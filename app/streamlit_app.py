@@ -96,10 +96,57 @@ def teams() -> list[str]:
 st.set_page_config(page_title="Knicks Win Probability", page_icon="🏀", layout="wide")
 st.title("🏀 Knicks Win Probability")
 
-replay_tab, calc_tab = st.tabs(["Game Replay", "Matchup Calculator"])
+odds_tab, replay_tab = st.tabs(["Matchup Odds", "Game Replay"])
+
+with odds_tab:
+    st.caption("Pick two teams for the outright odds at tip-off. "
+               "Expand the drill-down to set a specific moment in the game.")
+    predictor = get_predictor()
+    c1, c2 = st.columns(2)
+    home = c1.selectbox("Home team", teams(), format_func=name,
+                        index=teams().index("NYK") if "NYK" in teams() else 0)
+    away = c2.selectbox("Away team", teams(), format_func=name, index=0)
+
+    # Game-state controls live in a collapsed drill-down, so the default view is
+    # just the tip-off odds. Their defaults (Q1, full clock, tied) = game start.
+    PERIODS = {"1st Quarter": 1, "2nd Quarter": 2, "3rd Quarter": 3,
+               "4th Quarter": 4, "Overtime": 5}
+    with st.expander("Drill down to a specific moment"):
+        period_label = st.selectbox("Period", list(PERIODS))
+        period = PERIODS[period_label]
+        period_minutes = 12 if period <= 4 else 5  # OT periods are 5 minutes
+        t1, t2 = st.columns(2)
+        mins = t1.number_input("Minutes left", min_value=0, max_value=period_minutes,
+                               value=period_minutes, step=1)
+        secs = t2.number_input("Seconds left", min_value=0, max_value=59, value=0, step=1)
+        # Clock as total seconds (minutes:seconds is base-60), capped at the period.
+        clock_seconds = min(mins * 60 + secs, period_minutes * 60)
+        margin = st.slider("Home margin (home score - away score)", -30, 30, 0)
+    seconds_remaining, is_overtime = game_state_seconds(period, clock_seconds)
+
+    if home == away:
+        st.warning("Pick two different teams.")
+    else:
+        p = predictor.win_probability(
+            home, away, seconds_remaining=seconds_remaining,
+            score_diff=margin, is_overtime=is_overtime,
+        )
+        m1, m2 = st.columns(2)
+        m1.metric(f"{name(home)} win", f"{p:.1%}")
+        m2.metric(f"{name(away)} win", f"{1 - p:.1%}")
+
+        at_tipoff = not is_overtime and seconds_remaining >= 2880 and margin == 0
+        moment = ("at tip-off" if at_tipoff else
+                  f"with {clock_seconds // 60}:{clock_seconds % 60:02d} left in "
+                  f"{period_label.lower()}, home {margin:+d}")
+        st.caption(
+            f"Win probability {moment}.  Elo - {name(home)}: "
+            f"{predictor.ratings[home]:.0f}, {name(away)}: {predictor.ratings[away]:.0f}"
+        )
 
 with replay_tab:
-    st.caption("The model's live win probability through a real game (holdout seasons).")
+    st.caption("Drill into a single game: the win-probability curve as it played out "
+               "(the same view a live game would stream into).")
     team = st.selectbox("Filter by team", ["(all)"] + teams(),
                         format_func=lambda t: "All teams" if t == "(all)" else name(t))
     games = list_games(None if team == "(all)" else team)
@@ -124,7 +171,7 @@ with replay_tab:
             line=dict(color="#F58426", width=2), name=f"P({home} win)",
         ))
         fig.update_layout(
-            yaxis=dict(title=f"P({home} win)", range=[0, 1], tickformat=".0%"),
+            yaxis=dict(title=f"P({name(home)} win)", range=[0, 1], tickformat=".0%"),
             xaxis=dict(title="Game progression"),
             height=440, margin=dict(t=30),
         )
@@ -134,44 +181,4 @@ with replay_tab:
         st.markdown(
             f"**Final:** {name(away)} {int(g.away_pts)} - {int(g.home_pts)} {name(home)}  →  "
             f"**{name(winner)} won.**  Pre-game model: P({name(home)} win) = {df['p_home'].iloc[0]:.0%}"
-        )
-
-with calc_tab:
-    st.caption("Win probability for any matchup at any moment.")
-    predictor = get_predictor()
-    c1, c2 = st.columns(2)
-    home = c1.selectbox("Home team", teams(), format_func=name,
-                        index=teams().index("NYK") if "NYK" in teams() else 0)
-    away = c2.selectbox("Away team", teams(), format_func=name, index=0)
-
-    PERIODS = {"1st Quarter": 1, "2nd Quarter": 2, "3rd Quarter": 3,
-               "4th Quarter": 4, "Overtime": 5}
-    period_label = st.selectbox("Period", list(PERIODS))
-    period = PERIODS[period_label]
-    period_minutes = 12 if period <= 4 else 5  # OT periods are 5 minutes
-
-    t1, t2 = st.columns(2)
-    mins = t1.number_input("Minutes left", min_value=0, max_value=period_minutes,
-                           value=period_minutes, step=1)
-    secs = t2.number_input("Seconds left", min_value=0, max_value=59, value=0, step=1)
-    # Game clock as total seconds (minutes:seconds is base-60), capped at the
-    # period length so 12:59 in a 12-minute quarter can't sneak through.
-    clock_seconds = min(mins * 60 + secs, period_minutes * 60)
-    st.caption(f"Clock: {clock_seconds // 60}:{clock_seconds % 60:02d} left in {period_label.lower()}")
-    seconds_remaining, is_overtime = game_state_seconds(period, clock_seconds)
-    margin = st.slider("Home margin (home score - away score)", -30, 30, 0)
-
-    if home == away:
-        st.warning("Pick two different teams.")
-    else:
-        p = predictor.win_probability(
-            home, away, seconds_remaining=seconds_remaining,
-            score_diff=margin, is_overtime=is_overtime,
-        )
-        m1, m2 = st.columns(2)
-        m1.metric(f"{name(home)} win", f"{p:.1%}")
-        m2.metric(f"{name(away)} win", f"{1 - p:.1%}")
-        st.caption(
-            f"Current Elo - {name(home)}: {predictor.ratings[home]:.0f}, "
-            f"{name(away)}: {predictor.ratings[away]:.0f}"
         )
