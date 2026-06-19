@@ -131,11 +131,13 @@ def fit_xgboost(fit_df: pd.DataFrame, val_df: pd.DataFrame) -> XGBClassifier:
     return model
 
 
-def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float) -> None:
-    """Report log loss, Brier, and Brier skill score on the holdout set.
+def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float,
+             label: str = "holdout") -> None:
+    """Report log loss, Brier, and Brier skill score on a set of plays.
 
     base_rate is the train-set home win rate; the skill score measures how much
     the model beats always-predict-the-base-rate (the "knows nothing" baseline).
+    label names the slice being evaluated (e.g. "full holdout", "first quarter").
     """
     y_true = holdout_df[LABEL]
     probs = model.predict_proba(holdout_df[FEATURES])[:, 1]
@@ -147,7 +149,7 @@ def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float) -> None:
     base_brier = brier_score_loss(y_true, baseline)
     bss = 1 - (model_brier / base_brier)
 
-    log.info("Holdout evaluation (%d plays):", len(y_true))
+    log.info("Evaluation - %s (%d plays):", label, len(y_true))
     log.info("  Log loss:  %.4f   (base rate: %.4f)", model_ll, base_ll)
     log.info("  Brier:     %.4f   (base rate: %.4f)", model_brier, base_brier)
     log.info("  Brier skill score: %.4f   (0 = no better than base rate, 1 = perfect)", bss)
@@ -155,11 +157,17 @@ def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float) -> None:
 
 def win_prob(model: Model, seconds_remaining: float, score_diff: float,
              is_overtime: int, rating_diff: float) -> float:
-    """Predict P(home win) for a single hand-built game state."""
-    state = pd.DataFrame(
-        [[seconds_remaining, score_diff, is_overtime, rating_diff]],
-        columns=FEATURES,
-    )
+    """Predict P(home win) for a single hand-built game state.
+
+    Built by feature name and reindexed to FEATURES, so it stays correct
+    regardless of the column order the model was trained on.
+    """
+    state = pd.DataFrame([{
+        "seconds_remaining": seconds_remaining,
+        "score_diff": score_diff,
+        "is_overtime": is_overtime,
+        "rating_diff": rating_diff,
+    }])[FEATURES]
     return float(model.predict_proba(state)[:, 1][0])
 
 
@@ -172,18 +180,21 @@ def sanity_checks(model: Model) -> None:
     """
     # Tied game at the opening tip, evenly matched teams. Should sit near 0.50
     # (a touch above, since home teams win ~58% of the time overall).
-    tip_off = win_prob(model, seconds_remaining=2880, score_diff=0, is_overtime=0, rating_diff=0)
+    tip_off = win_prob(model, seconds_remaining=2880, score_diff=0,
+                       is_overtime=0, rating_diff=0)
     log.info("Sanity - tied at tip-off, even teams: %.3f", tip_off)
     assert 0.50 <= tip_off <= 0.65, f"tip-off should be ~home edge, got {tip_off:.3f}"
 
     # Home up 20 with 10 seconds left: near-certain win.
-    home_up = win_prob(model, seconds_remaining=10, score_diff=20, is_overtime=0, rating_diff=0)
-    log.info("Sanity - home up 20 with 10 seconds remaining, even teams: %.3f", home_up)
+    home_up = win_prob(model, seconds_remaining=10, score_diff=20,
+                       is_overtime=0, rating_diff=0)
+    log.info("Sanity - home up 20 with 10 seconds remaining: %.3f", home_up)
     assert home_up >= 0.97, f"up 20 with 10s left should be near-certain, got {home_up:.3f}"
 
     # Home down 3 with 5 seconds left: low but not zero.
-    home_down = win_prob(model, seconds_remaining=5, score_diff=-3, is_overtime=0, rating_diff=0)
-    log.info("Sanity - home down 3 with 5 seconds remaining, even teams: %.3f", home_down)
+    home_down = win_prob(model, seconds_remaining=5, score_diff=-3,
+                         is_overtime=0, rating_diff=0)
+    log.info("Sanity - home down 3 with 5 seconds remaining: %.3f", home_down)
     assert home_down <= 0.20, f"down 3 with 5s left should be low, got {home_down:.3f}"
 
 
@@ -204,9 +215,15 @@ def main() -> None:
 
     base_rate = train_df[LABEL].mean()
 
+    # The team-strength prior (rating_diff) matters most before the score and
+    # clock take over, so we also evaluate the opening period in isolation.
+    # First quarter = seconds_remaining >= 2160 (2880 total minus one 720s quarter).
+    first_q = holdout_df[holdout_df["seconds_remaining"] >= 2160]
+
     log.info("=== Logistic Regression (baseline) ===")
     baseline = fit_baseline(train_df)
-    evaluate(baseline, holdout_df, base_rate)
+    evaluate(baseline, holdout_df, base_rate, "full holdout")
+    evaluate(baseline, first_q, base_rate, "first quarter")
 
     log.info("=== XGBoost ===")
     # Carve a validation set out of train_df for early stopping. Same split
@@ -214,7 +231,8 @@ def main() -> None:
     # whether the held-out part is the final test or the early-stopping set.
     fit_df, val_df = split_by_time(train_df, validation_seasons)
     xgb = fit_xgboost(fit_df, val_df)
-    evaluate(xgb, holdout_df, base_rate)
+    evaluate(xgb, holdout_df, base_rate, "full holdout")
+    evaluate(xgb, first_q, base_rate, "first quarter")
 
     # Run the basketball sanity gate on the production candidate. Only a model
     # that clears it gets saved - the asserts halt the run otherwise.

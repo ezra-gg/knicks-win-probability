@@ -38,6 +38,10 @@ compare *args:
 train *args:
     {{py}} src/train.py {{args}}
 
+# Win probability for a specific matchup, e.g. `just predict NYK BOS`
+predict *args:
+    {{py}} src/predict.py {{args}}
+
 # --- quality ---
 
 # Run Python unit tests (pytest)
@@ -54,9 +58,15 @@ lint *args:
 rebuild: load
     just dbt build
 
-# Rebuild everything WITHOUT pulling new data: load, Elo, dbt build, train.
-# Use after a code/feature/param change, or once an overnight ingest is done.
-pipeline: load ratings
+# Rebuild everything WITHOUT pulling new data. Two-phase because the Python Elo
+# step sits in the middle of the dbt DAG: it reads int_roster_continuity and
+# writes team_ratings, which later models depend on.
+#   1. build continuity (+ its upstream) so ratings can read it
+#   2. run the Elo ratings (writes the team_ratings table)
+#   3. full dbt build of the ratings-dependent models, then train
+pipeline: load
+    just dbt build -s +int_roster_continuity
+    just ratings
     just dbt build
     just train
 
