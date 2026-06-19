@@ -48,16 +48,32 @@ See [docs/RUNBOOK.md](docs/RUNBOOK.md) to run the pipeline and
 
 ## Down the road
 
-A few directions I want to explore once the core model works:
+A few directions I want to explore now that the core model works:
 
-- **Player-aware team strength.** Right now team strength is a single Elo rating
-  per franchise, which means it can't tell that a roster changed. If a star gets
-  traded over the summer, the old team is still rated as if he never left. The plan
-  is to map players to teams over time, weight them by playing time, and build team
-  strength as the sum of the current roster's value instead of one franchise number.
-- **Smarter season transitions.** Regress team ratings toward the mean between
-  seasons, ideally weighted by how much of the roster actually returned, so a gutted
-  team drops and a team that kept its core does not.
+- **Roster-aware season transitions (in progress).** Instead of carrying a team's
+  Elo into the next season unchanged, regress it toward the mean by how much of the
+  roster turned over. Continuity is the fraction of last season's scoring production
+  that returned (`int_roster_continuity`), so a gutted team drops and a team that kept
+  its core does not. A first version weighted by scoring share is being built; the
+  richer player-value version below is the natural successor.
+- **Learned player value (RAPM).** Scoring share is an offense-only proxy: it misses
+  defenders and playmakers. The plan is to learn each player's value from outcomes
+  rather than the box score, with **Regularized Adjusted Plus-Minus** - regress
+  possession point-differential on which five players are on the court, so a player
+  who never scores but tilts the game still earns credit. The build:
+  1. Reconstruct five-man lineups from the play-by-play substitution events (already
+     ingested; ~1.3M of them).
+  2. Compute RAPM per player per season - our own values, all 26 seasons, one
+     consistent measure (no historical coverage gap).
+  3. Validate against the NBA's official player-tracking metrics (2013-14+) as a
+     convergent-validity check, the same way our Elo was checked against Net Rating
+     and SRS. A sanity test, not a feature source.
+  4. Optionally feed the official tracking metrics in as supplementary features for
+     the seasons they cover; XGBoost handles their absence in older seasons natively,
+     and the holdout sits entirely in the tracked era. Run as a measured experiment.
+- **Player-aware team strength.** With per-player values in hand, build team strength
+  as the current roster's summed value instead of one franchise Elo number, so a
+  mid-season trade reprices the team immediately.
 - **Provisional ratings.** A faster-moving rating early in a team's history to cut
   down on cold-start noise in the earliest seasons.
 

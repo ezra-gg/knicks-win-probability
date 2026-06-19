@@ -33,6 +33,7 @@ DEFAULT_OUT_PATH = PROJECT_ROOT / "data" / "team_ratings.parquet"
 # Tunables live in params.yml; see the comments there for what each one means.
 BASE_RATING = float(PARAMS["elo"]["base_rating"])
 K_FACTOR = float(PARAMS["elo"]["k_factor"])
+REGRESS_BETWEEN_SEASONS = bool(PARAMS["elo"]["regress_between_seasons"])
 
 
 def update_elo(home_rating: float, away_rating: float, home_won: int) -> tuple[float, float]:
@@ -58,6 +59,31 @@ def update_elo(home_rating: float, away_rating: float, home_won: int) -> tuple[f
     return (new_home, new_away)
 
 
+def load_continuity(con: duckdb.DuckDBPyConnection) -> dict[tuple[int, str], float]:
+    """Roster continuity per (season_start_year, team), from the dbt model.
+
+    int_roster_continuity (built before this script runs) holds the fraction of
+    last season's field-goal production that returned to each team. We just read
+    it into a lookup the rating loop can index by (season_start, team).
+    """
+    df = con.execute(
+        "SELECT season_start, team, continuity FROM int_roster_continuity"
+    ).df()
+    return {(int(r.season_start), r.team): float(r.continuity)
+            for r in df.itertuples(index=False)}
+
+
+def regress_to_mean(rating: float, continuity: float, mean: float = BASE_RATING) -> float:
+    """Pull a season-start rating toward the league mean based on roster turnover.
+
+    continuity is the fraction of last season's scoring that returned:
+      continuity 1.0 -> keep the full rating (the core came back)
+      continuity 0.0 -> reset all the way to the mean (a new team)
+    Values in between interpolate; the single expression covers all three.
+    """
+    return mean + continuity * (rating - mean)
+
+
 def build_ratings(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     log.info("Loading game results in chronological order...")
     games = con.execute("""
@@ -67,9 +93,29 @@ def build_ratings(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     """).df()
     log.info("Processing %d games.", len(games))
 
+    continuity = load_continuity(con)
+    log.info("Loaded roster continuity for %d team-seasons.", len(continuity))
+
     ratings: dict[str, float] = {}
+    last_season: dict[str, int] = {}  # most recent season_start seen per team
+
+    def apply_transition(team: str, season_start: int) -> None:
+        """On a team's first game of a new season, regress its rating by turnover."""
+        prev = last_season.get(team)
+        if REGRESS_BETWEEN_SEASONS and prev is not None and prev != season_start:
+            cont = continuity.get((season_start, team))
+            if cont is not None:
+                ratings[team] = regress_to_mean(ratings[team], cont)
+        last_season[team] = season_start
+
     rows = []
     for game in games.itertuples(index=False):
+        season_start = int(game.season[:4])
+        # Before reading pre-game ratings, fold in any season-boundary regression
+        # so a team that turned over its roster starts the season closer to mean.
+        apply_transition(game.home_abbr, season_start)
+        apply_transition(game.away_abbr, season_start)
+
         # Read each team's current rating. A team we have not seen starts at BASE_RATING.
         home_pre = ratings.get(game.home_abbr, BASE_RATING)
         away_pre = ratings.get(game.away_abbr, BASE_RATING)
