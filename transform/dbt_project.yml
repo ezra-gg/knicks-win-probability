@@ -15,6 +15,10 @@ seeds:
       +column_types:
         historical_tricode: varchar
         current_tricode: varchar
+    team_names:
+      +column_types:
+        tricode: varchar
+        full_name: varchar
 
 models:
   knicks_win_probability:

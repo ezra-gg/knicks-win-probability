@@ -15,7 +15,6 @@ import logging
 from pathlib import Path
 
 import duckdb
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -23,6 +22,7 @@ from sklearn.metrics import brier_score_loss, log_loss
 from xgboost import XGBClassifier
 
 from config import PARAMS
+from predict import save_model
 
 # Either model satisfies the same interface we use (predict_proba), so the
 # evaluation and sanity-check helpers accept both.
@@ -37,7 +37,7 @@ log = logging.getLogger("train")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.pkl"
+DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
 
 # All tunables live in params.yml (see comments there). game_id/date/season are
 # bookkeeping for the split and never go into X.
@@ -238,10 +238,9 @@ def main() -> None:
     # that clears it gets saved - the asserts halt the run otherwise.
     sanity_checks(xgb)
 
-    # Persist alongside the feature order, so whatever loads the model knows
-    # exactly which columns to pass and in what order.
-    args.model_out.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": xgb, "features": FEATURES}, args.model_out)
+    # Persist in XGBoost's native format (safe to share, version-stable) with
+    # the feature order in a sidecar, so any loader knows the column order.
+    save_model(xgb, FEATURES, args.model_out)
     log.info("Saved model -> %s", args.model_out)
 
 
