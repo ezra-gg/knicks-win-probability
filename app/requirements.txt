@@ -4,9 +4,9 @@
 #
 # Minimum-version pins rather than exact pins so Community Cloud can pick
 # pre-built wheels for whatever Python version it provisions.
-streamlit>=1.41.1
+streamlit>=1.54.0  # 1.54.0 fixes a Windows-only SSRF advisory; floor only, resolver still picks the latest wheel
 plotly>=5.24.1
 pandas>=2.0
-pyarrow>=14.0        # pandas reads the serving parquet files
+pyarrow>=23.0.1      # pandas reads the serving parquet files; 23.0.1 floor clears a use-after-free advisory
 xgboost>=2.1.4
 scikit-learn>=1.6.1  # required by xgboost's sklearn-API model loader
