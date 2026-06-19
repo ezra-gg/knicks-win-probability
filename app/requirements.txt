@@ -1,9 +1,12 @@
 # Dependencies for the Streamlit app only (no dbt - the app consumes artifacts,
 # it does not transform). Kept separate so deployment stays lean and avoids the
 # dbt/streamlit protobuf version conflict.
-streamlit==1.41.1
-plotly==5.24.1
-pandas==3.0.3
-pyarrow==20.0.0       # pandas reads the serving parquet files
-xgboost==2.1.4
-scikit-learn==1.6.1   # required by xgboost's sklearn-API model loader
+#
+# Minimum-version pins rather than exact pins so Community Cloud can pick
+# pre-built wheels for whatever Python version it provisions.
+streamlit>=1.41.1
+plotly>=5.24.1
+pandas>=2.0
+pyarrow>=14.0        # pandas reads the serving parquet files
+xgboost>=2.1.4
+scikit-learn>=1.6.1  # required by xgboost's sklearn-API model loader
