@@ -14,7 +14,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import duckdb
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -28,10 +27,12 @@ from predict import (  # noqa: E402
     load_model,
 )
 
-DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
+# The app reads only these committed serving artifacts - no DuckDB, no pipeline.
 MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
+RATINGS_PATH = PROJECT_ROOT / "data" / "serving" / "current_ratings.parquet"
+GAMES_PATH = PROJECT_ROOT / "data" / "serving" / "games.parquet"
+REPLAY_PATH = PROJECT_ROOT / "data" / "serving" / "replay.parquet"
 TEAM_NAMES_CSV = PROJECT_ROOT / "transform" / "seeds" / "team_names.csv"
-HOLDOUT_SEASONS = ("2024-25", "2025-26")
 
 
 @st.cache_data
@@ -52,38 +53,30 @@ def get_model():
 
 @st.cache_resource
 def get_predictor() -> MatchupPredictor:
-    return MatchupPredictor(MODEL_PATH, DB_PATH)
+    return MatchupPredictor(MODEL_PATH, RATINGS_PATH)
 
 
 @st.cache_data
+def all_games() -> pd.DataFrame:
+    return pd.read_parquet(GAMES_PATH).sort_values("game_date", ascending=False)
+
+
+@st.cache_data
+def all_replay() -> pd.DataFrame:
+    return pd.read_parquet(REPLAY_PATH)
+
+
 def list_games(team: str | None) -> pd.DataFrame:
-    seasons = "', '".join(HOLDOUT_SEASONS)
-    q = f"""
-        select game_id, game_date, home_abbr, away_abbr, home_pts, away_pts
-        from games
-        where season in ('{seasons}')
-    """
+    games = all_games()
     if team:
-        q += f" and (home_abbr = '{team}' or away_abbr = '{team}')"
-    q += " order by game_date desc"
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    try:
-        return con.execute(q).df()
-    finally:
-        con.close()
+        games = games[(games["home_abbr"] == team) | (games["away_abbr"] == team)]
+    return games
 
 
 @st.cache_data
 def game_curve(game_id: str) -> pd.DataFrame:
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    try:
-        df = con.execute(
-            f"""select * from int_model_input
-                where game_id = '{game_id}'
-                order by period, action_number"""
-        ).df()
-    finally:
-        con.close()
+    df = all_replay()
+    df = df[df["game_id"] == game_id].sort_values(["period", "action_number"]).copy()
     model, features = get_model()
     df["p_home"] = model.predict_proba(df[features])[:, 1]
     # Snap decided end-of-period moments to certainty (overrides the model).
@@ -95,18 +88,8 @@ def game_curve(game_id: str) -> pd.DataFrame:
 
 @st.cache_data
 def teams() -> list[str]:
-    """Only teams active in the most recent season, so defunct tricodes
-    (SEA, VAN, NJN, ...) don't show up in the dropdowns."""
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    try:
-        latest = con.execute("select max(season) from games").fetchone()[0]
-        df = con.execute(
-            f"""select home_abbr as team from games where season = '{latest}'
-                union select away_abbr from games where season = '{latest}'"""
-        ).df()
-    finally:
-        con.close()
-    return sorted(df["team"])
+    """Current teams come straight from the team-names reference."""
+    return sorted(team_names())
 
 
 # --- layout ---------------------------------------------------------------
