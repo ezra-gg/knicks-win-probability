@@ -80,14 +80,74 @@ def game_curve(game_id: str) -> pd.DataFrame:
     # Snap decided end-of-period moments to certainty (overrides the model).
     decided = [endgame_certainty(s, d) for s, d in zip(df["seconds_remaining"], df["score_diff"])]
     df["p_home"] = [c if c is not None else p for c, p in zip(decided, df["p_home"])]
-    df["play"] = range(len(df))  # monotonic game progression
+    df["elapsed"] = [elapsed_seconds(p, s)
+                     for p, s in zip(df["period"], df["seconds_remaining"])]
+    df["clock"] = [game_clock(p, s)
+                   for p, s in zip(df["period"], df["seconds_remaining"])]
+    # The feed's action order has occasional clock anomalies (an event stamped
+    # earlier in the game listed after a later one). Draw the curve in true time
+    # order so the line never doubles back; action_number breaks ties at a whistle.
+    df = df.sort_values(["elapsed", "action_number"]).reset_index(drop=True)
     return df
+
+
+def period_name(period: int) -> str:
+    """Q1-Q4 in regulation; OT, 2OT, ... beyond."""
+    if period <= 4:
+        return f"Q{period}"
+    ot = period - 4
+    return "OT" if ot == 1 else f"{ot}OT"
+
+
+def game_clock(period: int, seconds_remaining: float) -> str:
+    """Human-readable game clock for hover, e.g. "Q3 5:42".
+
+    seconds_remaining is left in the whole game during regulation, so we strip
+    out the later quarters to get the clock within this period; in OT it already
+    is the period's own clock.
+    """
+    in_period = seconds_remaining - (4 - period) * 720 if period <= 4 else seconds_remaining
+    mins, secs = divmod(int(in_period), 60)
+    return f"{period_name(period)} {mins}:{secs:02d}"
+
+
+def period_start_elapsed(period: int) -> float:
+    """Elapsed seconds at the tip of a given period (where its tick sits)."""
+    if period <= 4:
+        return (period - 1) * 720
+    return REGULATION_SECONDS + (period - 5) * OT_SECONDS
+
+
+def quarter_ticks(periods: list[int]) -> tuple[list[float], list[str]]:
+    """Tick (position, label) pairs at the start of each period in the game."""
+    starts = sorted(set(periods))
+    vals = [period_start_elapsed(p) for p in starts]
+    return vals, [period_name(p) for p in starts]
 
 
 @st.cache_data
 def teams() -> list[str]:
     """Current teams come straight from the team-names reference."""
     return sorted(team_names())
+
+
+REGULATION_SECONDS = 2880  # 4 x 12-minute quarters
+OT_SECONDS = 300           # each overtime period is 5 minutes
+
+
+def elapsed_seconds(period: int, seconds_remaining: float) -> float:
+    """Game time elapsed (counts up from 0), from the model's countdown clock.
+
+    seconds_remaining counts DOWN: in regulation it's time left in the whole
+    game (2880 -> 0); in OT it resets to that single 5-minute period's clock.
+    We invert it so the replay x-axis runs left-to-right, with quarter
+    boundaries landing on clean multiples of 720.
+    """
+    if period <= 4:
+        return REGULATION_SECONDS - seconds_remaining
+    return (REGULATION_SECONDS
+            + (period - 5) * OT_SECONDS
+            + (OT_SECONDS - seconds_remaining))
 
 
 def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool,
@@ -238,15 +298,36 @@ with replay_tab:
         home, away = g.home_abbr, g.away_abbr
         home_won = g.home_pts > g.away_pts
 
+        # Default to the filtered team's perspective; fall back to home.
+        default_idx = 1 if team == away else 0
+        perspective = st.radio(
+            "Show odds for",
+            [name(home), name(away)],
+            index=default_idx,
+            horizontal=True,
+            key=f"replay_perspective_{game_id}",
+        )
+        show_home = perspective == name(home)
+        viewed_team = home if show_home else away
+        p_curve = df["p_home"] if show_home else 1 - df["p_home"]
+
+        tickvals, ticktext = quarter_ticks(df["period"].tolist())
         fig = go.Figure()
         fig.add_hline(y=0.5, line_dash="dot", line_color="gray")
+        # Faint vertical line at each quarter boundary, so the periods read as
+        # distinct segments rather than one continuous sweep.
+        for x in tickvals[1:]:
+            fig.add_vline(x=x, line_dash="dot", line_color="#e0e0e0")
         fig.add_trace(go.Scatter(
-            x=df["play"], y=df["p_home"], mode="lines",
-            line=dict(color="#F58426", width=2), name=f"P({home} win)",
+            x=df["elapsed"], y=p_curve, mode="lines",
+            line=dict(color="#F58426", width=2), name=f"P({viewed_team} win)",
+            customdata=df["clock"],
+            hovertemplate=f"%{{customdata}}<br>{name(viewed_team)} win: %{{y:.0%}}<extra></extra>",
         ))
         fig.update_layout(
-            yaxis=dict(title=f"Percent Chance of {name(home)} Winning", range=[0, 1], tickformat=".0%"),
-            xaxis=dict(title="Game progression"),
+            yaxis=dict(title=f"Percent Chance of {name(viewed_team)} Winning",
+                       range=[0, 1], tickformat=".0%"),
+            xaxis=dict(title="Game progression", tickvals=tickvals, ticktext=ticktext),
             height=440, margin=dict(t=30),
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -254,5 +335,5 @@ with replay_tab:
         winner = home if home_won else away
         st.markdown(
             f"**Final:** {name(away)} {int(g.away_pts)} - {int(g.home_pts)} {name(home)}  →  "
-            f"**{name(winner)} won.**  Pre-game model: P({name(home)} win) = {df['p_home'].iloc[0]:.0%}"
+            f"**{name(winner)} won.**  Pre-game model: P({name(viewed_team)} win) = {p_curve.iloc[0]:.0%}"
         )

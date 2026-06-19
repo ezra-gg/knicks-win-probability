@@ -21,7 +21,8 @@ the Streamlit app replays that estimate across the whole game.
 
 Three views: an **overview** (one team's tip-off odds against the whole league),
 a **matchup drill-down** (any two teams at any game state), and a **game replay**
-(the win-probability curve through any historical game).
+(the win-probability curve through any historical game, plotted across the four
+quarters with a perspective toggle to follow either team's odds).
 
 To run locally instead:
 
