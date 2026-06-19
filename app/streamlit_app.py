@@ -1,12 +1,10 @@
 """
 Knicks Win Probability - interactive showcase.
 
-Two views:
+Three views:
+  - Overview: one team's odds against every other team, at a glance.
+  - Matchup Drill-Down: P(home win) for any two teams at any game state.
   - Game Replay: the win-probability curve through any historical game.
-  - Matchup Calculator: P(home win) for any two teams at any game state.
-
-Reads the trained model and the dbt-built int_model_input from DuckDB. The app
-only consumes artifacts; all modeling lives in src/ and transform/.
 """
 
 from __future__ import annotations
@@ -92,11 +90,27 @@ def teams() -> list[str]:
     return sorted(team_names())
 
 
+def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool) -> pd.DataFrame:
+    """One team's tip-off win probability against every other current team.
+
+    Returns a DataFrame with columns "opponent" (tricode) and "p_win"
+    (P(`team` wins)), one row per opposing team. The Team vs Field tab renders
+    this as a sorted bar chart, so the row order here is the bar order.
+    """
+    opponents = [opp for opp in teams() if opp != team]
+    odds = [
+        {"opponent": opp, "p_win": predictor.win_probability(team, opp) if at_home
+                                else 1 - predictor.win_probability(opp, team)}
+        for opp in opponents
+    ]
+    return pd.DataFrame(odds)
+
 # --- layout ---------------------------------------------------------------
 st.set_page_config(page_title="Knicks Win Probability", page_icon="🏀", layout="wide")
 st.title("🏀 Knicks Win Probability")
 
-odds_tab, replay_tab = st.tabs(["Matchup Odds", "Game Replay"])
+overview_tab, odds_tab, replay_tab = st.tabs(
+    ["Overview", "Matchup Drill-Down", "Game Replay"])
 
 with odds_tab:
     st.caption("Pick two teams for the outright odds at tip-off. "
@@ -143,6 +157,55 @@ with odds_tab:
             f"Win probability {moment}.  Elo - {name(home)}: "
             f"{predictor.ratings[home]:.0f}, {name(away)}: {predictor.ratings[away]:.0f}"
         )
+
+with overview_tab:
+    st.caption("See how one team's tip-off odds stack up against the whole league, "
+               "then pick an opponent to drill into the head-to-head.")
+    predictor = get_predictor()
+    fc1, fc2 = st.columns([2, 1])
+    team = fc1.selectbox("Team", teams(), format_func=name, key="field_team",
+                         index=teams().index("NYK") if "NYK" in teams() else 0)
+    court = fc2.radio("Court", ["Home", "Away"], horizontal=True, key="field_court")
+
+    field = field_matchups(predictor, team, at_home=(court == "Home"))
+
+    SORT_OPTIONS = {
+        "Win probability: high to low": ("p_win", False),
+        "Win probability: low to high": ("p_win", True),
+        "Team name: A to Z":            ("opponent", True),
+        "Team name: Z to A":            ("opponent", False),
+    }
+    sort_label = st.selectbox("Sort by", list(SORT_OPTIONS), key="field_sort")
+    sort_col, ascending = SORT_OPTIONS[sort_label]
+    # Horizontal bar charts render bottom-to-top, so flip ascending to put the
+    # "best" row (highest prob or A) at the top of the chart, not the bottom.
+    field = field.sort_values(sort_col, ascending=not ascending).reset_index(drop=True)
+
+    # Knicks orange where the team is favored, gray where it's the underdog -
+    # the 50% line splits the field into wins and losses at a glance.
+    colors = ["#F58426" if p >= 0.5 else "#9aa0a6" for p in field["p_win"]]
+    fig = go.Figure(go.Bar(
+        x=field["p_win"], y=[name(o) for o in field["opponent"]],
+        orientation="h", marker_color=colors,
+        text=[f"{p:.0%}" for p in field["p_win"]], textposition="auto",
+    ))
+    fig.add_vline(x=0.5, line_dash="dot", line_color="gray")
+    fig.update_layout(
+        xaxis=dict(title=f"P({name(team)} win, {court.lower()})",
+                   range=[0, 1], tickformat=".0%"),
+        height=max(440, 20 * len(field)), margin=dict(t=30, l=10),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Drill-down: one opponent's head-to-head readout.
+    opp = st.selectbox("Drill into a matchup", list(field["opponent"]),
+                       format_func=name, key="field_opp")
+    p = field.set_index("opponent").loc[opp, "p_win"]
+    d1, d2 = st.columns(2)
+    d1.metric(f"{name(team)} win", f"{p:.1%}")
+    d2.metric(f"{name(opp)} win", f"{1 - p:.1%}")
+    st.caption(f"{court} game.  Elo - {name(team)}: {predictor.ratings[team]:.0f}, "
+               f"{name(opp)}: {predictor.ratings[opp]:.0f}")
 
 with replay_tab:
     st.caption("Drill into a single game: the win-probability curve as it played out "

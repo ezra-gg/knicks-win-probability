@@ -25,8 +25,9 @@ pip install -r app/requirements.txt
 just app          # or: streamlit run app/streamlit_app.py
 ```
 
-It opens two views: a **game replay** (the win-probability curve through any
-recent game) and a **matchup calculator** (any two teams at any game state).
+It opens three views: an **overview** (one team's tip-off odds against the whole
+league), a **matchup drill-down** (any two teams at any game state), and a
+**game replay** (the win-probability curve through any historical game).
 
 ## Rebuild from scratch
 
@@ -53,7 +54,7 @@ fetches what's new, so it's safe to interrupt and resume.
 - [x] Feature engineering (dbt: staging -> intermediate -> mart)
 - [x] Team strength ratings (Elo, validated against Net Rating and SRS)
 - [x] Model training and calibration (logistic baseline + XGBoost)
-- [x] Matchup predictor + Streamlit app (game replay + matchup calculator)
+- [x] Matchup predictor + Streamlit app (overview, matchup drill-down, game replay)
 - [ ] Live game listener (stream an in-progress game, update the curve in real time)
 - [ ] Player-aware team strength (see "Down the road")
 
@@ -117,7 +118,7 @@ knicks-win-probability/
 ├── src/           # ingestion, Elo ratings, validation, model training
 ├── transform/     # dbt project (staging -> intermediate -> mart, + tests)
 ├── tests/         # pytest unit tests
-├── docs/          # runbook and maintenance guide
+├── docs/          # RUNBOOK.md (pipeline commands) and MAINTENANCE.md (long-term upkeep)
 ├── data/          # raw CSVs and the DuckDB database (gitignored)
 ├── notebooks/     # exploratory analysis
 ├── app/           # Streamlit dashboard
