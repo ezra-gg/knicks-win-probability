@@ -46,6 +46,25 @@ models:
       - name: seconds_remaining
         tests: [not_null]
 
+  - name: dim_teams
+    description: >
+      Conformed team dimension. One row per tricode that has ever appeared,
+      mapped to its current (canonical) code and franchise name. The single
+      source of truth for team identity, exported to serving for the app.
+    columns:
+      - name: tricode
+        tests: [not_null, unique]
+      - name: canonical_tricode
+        tests: [not_null]
+      - name: full_name
+        tests: [not_null]
+      - name: is_current
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
   - name: player_team_seasons
     description: Player involvement by team and season, one row per player/team/season.
     columns:

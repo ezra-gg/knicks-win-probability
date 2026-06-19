@@ -176,8 +176,12 @@ def pull_play_by_play(
         saved += len(buffer)
         buffer = []
 
+    # Log progress at ~1% increments instead of once per game: a full backfill
+    # is tens of thousands of games, so per-game lines bury the signal. Per-game
+    # failures still surface via _fetch_with_retry's own warnings.
+    progress_every = max(1, len(todo) // 100)
+
     for i, game_id in enumerate(todo, start=1):
-        log.info("[%d/%d] fetching play-by-play for %s", i, len(todo), game_id)
         df = _fetch_with_retry(game_id)
         if df is not None and not df.empty:
             buffer.append(df)
@@ -185,8 +189,9 @@ def pull_play_by_play(
         # Checkpoint periodically so a crash loses at most one batch.
         if len(buffer) >= checkpoint_every:
             flush()
-            log.info("  checkpoint: %d/%d processed, %d games saved so far",
-                     i, len(todo), saved)
+        if i % progress_every == 0 or i == len(todo):
+            log.info("[%d/%d] %d%% processed, %d saved to disk",
+                     i, len(todo), round(100 * i / len(todo)), saved)
 
     flush()  # write the final partial batch
     log.info("Saved %d new game(s) to %s", saved, out_path)
