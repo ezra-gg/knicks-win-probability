@@ -10,12 +10,21 @@ the model should be measured against these:
 
 | Metric | Logistic (baseline) | XGBoost (shipped) |
 | ------ | ------------------- | ----------------- |
-| Log loss | 0.4716 | 0.4503 |
-| Brier | 0.1571 | 0.1507 |
-| Brier skill score | 0.369 | 0.395 |
+| Log loss | 0.4740 | 0.4558 |
+| Brier | 0.1579 | 0.1525 |
+| Brier skill score | 0.366 | 0.388 |
 
-XGBoost early-stops around 196 trees. The sanity gate must stay green: tied at
-tip-off ~0.59, up 20 with 10s left ~0.99, down 3 with 5s left ~0.11.
+Holdout is 2024-25 and 2025-26, regular season + playoffs (~33k games total).
+Broken down by game type on the XGBoost model:
+
+| Slice | BSS |
+| ----- | --- |
+| Regular season | 0.394 |
+| Playoffs | 0.296 |
+
+The playoff gap is expected - higher-variance games between evenly matched teams.
+XGBoost early-stops around 162-181 trees. The sanity gate must stay green: tied at
+tip-off ~0.56, up 20 with 10s left ~0.997, down 3 with 5s left ~0.089.
 
 ## Where configuration lives
 

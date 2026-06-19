@@ -5,7 +5,7 @@ pbp as (
 ),
 
 games as (
-    select game_id, game_date, season, home_won from {{ ref('stg_games') }}
+    select game_id, game_date, season, is_playoff, home_won from {{ ref('stg_games') }}
 ),
 
 filled_scores as (
@@ -53,6 +53,7 @@ final as (
                 )
                 + (4 - f.period) * 720
         end                                        as seconds_remaining,
+        g.is_playoff,
         g.game_date,
         g.season,
         g.home_won

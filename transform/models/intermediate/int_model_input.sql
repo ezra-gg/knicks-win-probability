@@ -19,6 +19,7 @@ select
     f.seconds_remaining,
     f.score_diff,
     f.is_overtime,
+    f.is_playoff,
     r.rating_diff,
     f.home_won
 from features f

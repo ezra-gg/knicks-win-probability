@@ -90,7 +90,8 @@ def teams() -> list[str]:
     return sorted(team_names())
 
 
-def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool) -> pd.DataFrame:
+def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool,
+                   is_playoff: int = 0) -> pd.DataFrame:
     """One team's tip-off win probability against every other current team.
 
     Returns a DataFrame with columns "opponent" (tricode) and "p_win"
@@ -99,8 +100,8 @@ def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool) -> pd.
     """
     opponents = [opp for opp in teams() if opp != team]
     odds = [
-        {"opponent": opp, "p_win": predictor.win_probability(team, opp) if at_home
-                                else 1 - predictor.win_probability(opp, team)}
+        {"opponent": opp, "p_win": predictor.win_probability(team, opp, is_playoff=is_playoff) if at_home
+                                else 1 - predictor.win_probability(opp, team, is_playoff=is_playoff)}
         for opp in opponents
     ]
     return pd.DataFrame(odds)
@@ -120,6 +121,8 @@ with odds_tab:
     home = c1.selectbox("Home team", teams(), format_func=name,
                         index=teams().index("NYK") if "NYK" in teams() else 0)
     away = c2.selectbox("Away team", teams(), format_func=name, index=0)
+
+    is_playoff = int(st.toggle("Playoff game", key="odds_playoff"))
 
     # Game-state controls live in a collapsed drill-down, so the default view is
     # just the tip-off odds. Their defaults (Q1, full clock, tied) = game start.
@@ -143,7 +146,7 @@ with odds_tab:
     else:
         p = predictor.win_probability(
             home, away, seconds_remaining=seconds_remaining,
-            score_diff=margin, is_overtime=is_overtime,
+            score_diff=margin, is_overtime=is_overtime, is_playoff=is_playoff,
         )
         m1, m2 = st.columns(2)
         m1.metric(f"{name(home)} win", f"{p:.1%}")
@@ -162,12 +165,14 @@ with overview_tab:
     st.caption("See how one team's tip-off odds stack up against the whole league, "
                "then pick an opponent to drill into the head-to-head.")
     predictor = get_predictor()
-    fc1, fc2 = st.columns([2, 1])
+    fc1, fc2, fc3 = st.columns([2, 1, 1])
     team = fc1.selectbox("Team", teams(), format_func=name, key="field_team",
                          index=teams().index("NYK") if "NYK" in teams() else 0)
     court = fc2.radio("Court", ["Home", "Away"], horizontal=True, key="field_court")
+    is_playoff = int(fc3.toggle("Playoff game", key="field_playoff"))
 
-    field = field_matchups(predictor, team, at_home=(court == "Home"))
+    field = field_matchups(predictor, team, at_home=(court == "Home"),
+                           is_playoff=is_playoff)
 
     SORT_OPTIONS = {
         "Team Name: A to Z":            ("opponent", True),
@@ -209,7 +214,8 @@ with overview_tab:
             d1, d2 = st.columns(2)
             d1.metric(f"{name(team)} win", f"{p:.1%}")
             d2.metric(f"{name(opp)} win", f"{1 - p:.1%}")
-            st.caption(f"{court} game.  Elo - {name(team)}: {predictor.ratings[team]:.0f}, "
+            game_context = ("Playoff" if is_playoff else "Regular season") + f", {court.lower()}"
+            st.caption(f"{game_context}.  Elo - {name(team)}: {predictor.ratings[team]:.0f}, "
                        f"{name(opp)}: {predictor.ratings[opp]:.0f}")
 
 with replay_tab:
