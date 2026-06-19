@@ -30,18 +30,25 @@ MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
 RATINGS_PATH = PROJECT_ROOT / "data" / "serving" / "current_ratings.parquet"
 GAMES_PATH = PROJECT_ROOT / "data" / "serving" / "games.parquet"
 REPLAY_PATH = PROJECT_ROOT / "data" / "serving" / "replay.parquet"
-TEAM_NAMES_CSV = PROJECT_ROOT / "transform" / "seeds" / "team_names.csv"
+TEAMS_PATH = PROJECT_ROOT / "data" / "serving" / "teams.parquet"
 
 
 @st.cache_data
-def team_names() -> dict[str, str]:
-    """Tricode -> full name, read straight from the seed CSV."""
-    df = pd.read_csv(TEAM_NAMES_CSV)
+def teams_dim() -> pd.DataFrame:
+    """The conformed team dimension (tricode, canonical_tricode, full_name,
+    is_current), exported from dbt's dim_teams - the single source of truth."""
+    return pd.read_parquet(TEAMS_PATH)
+
+
+@st.cache_data
+def _name_map() -> dict[str, str]:
+    df = teams_dim()
     return dict(zip(df["tricode"], df["full_name"]))
 
 
 def name(tricode: str) -> str:
-    return team_names().get(tricode, tricode)
+    """Full franchise name for any tricode, current or historical."""
+    return _name_map().get(tricode, tricode)
 
 
 @st.cache_resource
@@ -127,8 +134,10 @@ def quarter_ticks(periods: list[int]) -> tuple[list[float], list[str]]:
 
 @st.cache_data
 def teams() -> list[str]:
-    """Current teams come straight from the team-names reference."""
-    return sorted(team_names())
+    """Current franchises only (tricodes), for the pickers - excludes historical
+    aliases so the dropdowns show today's 30 teams."""
+    df = teams_dim()
+    return sorted(df[df["is_current"]]["tricode"])
 
 
 REGULATION_SECONDS = 2880  # 4 x 12-minute quarters

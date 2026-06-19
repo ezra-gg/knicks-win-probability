@@ -56,6 +56,15 @@ def main() -> None:
                 select * from int_model_input where season in ('{seasons}')
             ) TO '{OUT_DIR / "replay.parquet"}' (FORMAT parquet)
         """)
+
+        # Conformed team dimension (tricode -> canonical code + name). ~35 rows.
+        # The app and ratings validation read this instead of the raw seeds.
+        con.execute(f"""
+            COPY (
+                select tricode, canonical_tricode, full_name, is_current
+                from dim_teams
+            ) TO '{OUT_DIR / "teams.parquet"}' (FORMAT parquet)
+        """)
     finally:
         con.close()
 
