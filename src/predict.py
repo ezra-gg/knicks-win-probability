@@ -102,7 +102,8 @@ class MatchupPredictor:
 
     def win_probability(self, home_team: str, away_team: str,
                         seconds_remaining: float = REGULATION_SECONDS,
-                        score_diff: int = 0, is_overtime: int = 0) -> float:
+                        score_diff: int = 0, is_overtime: int = 0,
+                        is_playoff: int = 0) -> float:
         """P(home_team wins) at the given game state. Defaults to pre-game (tip-off)."""
         for team in (home_team, away_team):
             if team not in self.ratings:
@@ -118,6 +119,7 @@ class MatchupPredictor:
             "seconds_remaining": seconds_remaining,
             "score_diff": score_diff,
             "is_overtime": is_overtime,
+            "is_playoff": is_playoff,
             "rating_diff": rating_diff,
         }])[self.features]
         return float(self.model.predict_proba(row)[:, 1][0])

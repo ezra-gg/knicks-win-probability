@@ -3,6 +3,7 @@
     "seconds_remaining",
     "score_diff",
     "is_overtime",
+    "is_playoff",
     "rating_diff"
   ]
 }
