@@ -195,17 +195,22 @@ with overview_tab:
                    range=[0, 1], tickformat=".0%"),
         height=max(440, 20 * len(field)), margin=dict(t=30, l=10),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    event = st.plotly_chart(fig, use_container_width=True,
+                            on_select="rerun", selection_mode="points")
 
-    # Drill-down: one opponent's head-to-head readout.
-    opp = st.selectbox("Drill into a matchup", list(field["opponent"]),
-                       format_func=name, key="field_opp")
-    p = field.set_index("opponent").loc[opp, "p_win"]
-    d1, d2 = st.columns(2)
-    d1.metric(f"{name(team)} win", f"{p:.1%}")
-    d2.metric(f"{name(opp)} win", f"{1 - p:.1%}")
-    st.caption(f"{court} game.  Elo - {name(team)}: {predictor.ratings[team]:.0f}, "
-               f"{name(opp)}: {predictor.ratings[opp]:.0f}")
+    # Drill-down appears only after the user clicks a bar.
+    if event.selection.points:
+        selected_name = event.selection.points[0]["y"]
+        name_to_tricode = {name(o): o for o in field["opponent"]}
+        opp = name_to_tricode.get(selected_name)
+        if opp:
+            p = field.set_index("opponent").loc[opp, "p_win"]
+            st.divider()
+            d1, d2 = st.columns(2)
+            d1.metric(f"{name(team)} win", f"{p:.1%}")
+            d2.metric(f"{name(opp)} win", f"{1 - p:.1%}")
+            st.caption(f"{court} game.  Elo - {name(team)}: {predictor.ratings[team]:.0f}, "
+                       f"{name(opp)}: {predictor.ratings[opp]:.0f}")
 
 with replay_tab:
     st.caption("Drill into a single game: the win-probability curve as it played out "
