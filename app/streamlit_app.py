@@ -170,10 +170,10 @@ with overview_tab:
     field = field_matchups(predictor, team, at_home=(court == "Home"))
 
     SORT_OPTIONS = {
-        "Win probability: high to low": ("p_win", False),
-        "Win probability: low to high": ("p_win", True),
-        "Team name: A to Z":            ("opponent", True),
-        "Team name: Z to A":            ("opponent", False),
+        "Team Name: A to Z":            ("opponent", True),
+        "Team Name: Z to A":            ("opponent", False),
+        "Win Probability: High to Low": ("p_win", False),
+        "Win Probability: Low to High": ("p_win", True)
     }
     sort_label = st.selectbox("Sort by", list(SORT_OPTIONS), key="field_sort")
     sort_col, ascending = SORT_OPTIONS[sort_label]
@@ -191,7 +191,7 @@ with overview_tab:
     ))
     fig.add_vline(x=0.5, line_dash="dot", line_color="gray")
     fig.update_layout(
-        xaxis=dict(title=f"Percent Chance {name(team)} Win ({court})",
+        xaxis=dict(title=f"Percent Chance of {name(team)} Winning ({court})",
                    range=[0, 1], tickformat=".0%"),
         height=max(440, 20 * len(field)), margin=dict(t=30, l=10),
     )
@@ -239,7 +239,7 @@ with replay_tab:
             line=dict(color="#F58426", width=2), name=f"P({home} win)",
         ))
         fig.update_layout(
-            yaxis=dict(title=f"P({name(home)} win)", range=[0, 1], tickformat=".0%"),
+            yaxis=dict(title=f"Percent Chance of {name(home)} Winning", range=[0, 1], tickformat=".0%"),
             xaxis=dict(title="Game progression"),
             height=440, margin=dict(t=30),
         )

@@ -31,6 +31,11 @@ league), a **matchup drill-down** (any two teams at any game state), and a
 
 ## Rebuild from scratch
 
+> **Platform note:** the data pipeline currently requires macOS or Linux. The
+> pipeline scripts are bash-based and the justfile uses Unix virtualenv paths.
+> Windows support is not planned, but the app can be enjoyed without local 
+> download on Streamlit Community Cloud.
+
 Requires Python 3.12+. To regenerate everything from source:
 
 ```bash
