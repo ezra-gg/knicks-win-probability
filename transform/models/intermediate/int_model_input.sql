@@ -18,6 +18,8 @@ select
     f.period,
     f.seconds_remaining,
     f.score_diff,
+    f.score_home,
+    f.score_away,
     f.is_overtime,
     f.is_playoff,
     r.rating_diff,

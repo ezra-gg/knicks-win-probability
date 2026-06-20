@@ -321,6 +321,11 @@ with replay_tab:
         p_curve = df["p_home"] if show_home else 1 - df["p_home"]
 
         tickvals, ticktext = quarter_ticks(df["period"].tolist())
+        # Live scoreboard at each moment, e.g. "NYK 58 - 52 SAS". Always shown
+        # home-then-away so it reads the same regardless of the perspective toggle.
+        scoreboard = [f"{home} {int(h)} - {int(a)} {away}"
+                      for h, a in zip(df["score_home"], df["score_away"])]
+        hover = list(zip(df["clock"], scoreboard))
         fig = go.Figure()
         fig.add_hline(y=0.5, line_dash="dot", line_color="gray")
         # Faint vertical line at each quarter boundary, so the periods read as
@@ -330,8 +335,9 @@ with replay_tab:
         fig.add_trace(go.Scatter(
             x=df["elapsed"], y=p_curve, mode="lines",
             line=dict(color="#F58426", width=2), name=f"P({viewed_team} win)",
-            customdata=df["clock"],
-            hovertemplate=f"%{{customdata}}<br>{name(viewed_team)} win: %{{y:.0%}}<extra></extra>",
+            customdata=hover,
+            hovertemplate=(f"%{{customdata[0]}}<br>%{{customdata[1]}}<br>"
+                           f"{name(viewed_team)} win: %{{y:.0%}}<extra></extra>"),
         ))
         fig.update_layout(
             yaxis=dict(title=f"Percent Chance of {name(viewed_team)} Winning",
