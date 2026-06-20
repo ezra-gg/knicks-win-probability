@@ -29,6 +29,7 @@ DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
 def load(raw_dir: Path, db_path: Path) -> None:
     games_csv = raw_dir / "games.csv"
     pbp_csv = raw_dir / "play_by_play.csv"
+    boxscores_csv = raw_dir / "boxscores.csv"
     if not games_csv.exists():
         raise FileNotFoundError(f"{games_csv} not found. Run src/ingest.py first.")
 
@@ -37,6 +38,9 @@ def load(raw_dir: Path, db_path: Path) -> None:
     games_df = pd.read_csv(games_csv, dtype={"game_id": str})
     log.info("Reading %s", pbp_csv)
     pbp_df = pd.read_csv(pbp_csv, dtype={"gameId": str}) if pbp_csv.exists() else pd.DataFrame()
+    log.info("Reading %s", boxscores_csv)
+    box_df = (pd.read_csv(boxscores_csv, dtype={"gameId": str, "personId": str})
+              if boxscores_csv.exists() else pd.DataFrame())
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db_path))
@@ -50,6 +54,12 @@ def load(raw_dir: Path, db_path: Path) -> None:
             con.execute("CREATE OR REPLACE TABLE play_by_play AS SELECT * FROM pbp_df")
             log.info("Loaded table 'play_by_play' (%d rows, %d games).",
                      len(pbp_df), pbp_df["gameId"].nunique())
+
+        # Box scores are optional too (player-aware strength). Skip until pulled.
+        if not box_df.empty:
+            con.execute("CREATE OR REPLACE TABLE boxscores AS SELECT * FROM box_df")
+            log.info("Loaded table 'boxscores' (%d rows, %d games).",
+                     len(box_df), box_df["gameId"].nunique())
 
         log.info("Verifying with SQL...")
         tables = con.execute("SHOW TABLES").df()

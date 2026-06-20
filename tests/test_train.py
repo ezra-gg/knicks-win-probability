@@ -52,7 +52,7 @@ def test_both_sets_nonempty(sample_df):
 def test_no_game_in_both_sets(sample_df):
     """The leakage guarantee: no game_id appears in both train and holdout.
 
-    TODO(human): assert that the set of game_ids in train and the set of
+    Assert that the set of game_ids in train and the set of
     game_ids in holdout have no overlap. Build a set from each side's
     "game_id" column and check their intersection is empty.
     """
