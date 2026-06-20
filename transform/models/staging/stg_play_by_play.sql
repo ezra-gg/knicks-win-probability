@@ -15,5 +15,8 @@ select
     "xLegacy"      as x,
     "yLegacy"      as y,
     "actionType"   as action_type,
-    "subType"      as sub_type
+    "subType"      as sub_type,
+    -- Free-text event description. Needed for substitutions, whose incoming
+    -- player is named only here ("SUB: <in> FOR <out>"), not in a column.
+    description
 from {{ source('nba', 'play_by_play') }}

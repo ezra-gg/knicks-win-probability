@@ -22,6 +22,10 @@ dbt *args:
 ingest *args:
     ./scripts/ingest.sh {{args}}
 
+# Ingest traditional box scores per game (starters + player lines, long-running)
+ingest-boxscores *args:
+    {{py}} src/ingest_boxscores.py {{args}}
+
 # Load raw CSVs into DuckDB
 load:
     ./scripts/load.sh
@@ -29,6 +33,10 @@ load:
 # Rebuild Elo team ratings (writes parquet + DuckDB table)
 ratings:
     ./scripts/ratings.sh
+
+# Reconstruct on-court lineups per game (writes parquet + DuckDB table)
+lineups:
+    ./scripts/lineups.sh
 
 # Compare our Elo to Net Rating and SRS benchmarks
 compare *args:

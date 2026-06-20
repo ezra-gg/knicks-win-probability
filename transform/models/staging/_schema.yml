@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: stg_lineups
+    description: On-court five-man stints per game, one row per team per stint.
+    columns:
+      - name: game_id
+        tests: [not_null]
+      - name: team
+        tests: [not_null]
+      - name: lineup
+        tests: [not_null]
+      - name: n_players
+        tests: [not_null]
