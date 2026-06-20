@@ -20,6 +20,17 @@ sources:
       - name: play_by_play
         description: Event-level stream - one row per play across all games.
 
+      - name: boxscores
+        description: >
+          Traditional box score - one row per (game, player) with the starter
+          order, minutes, and full line. Pulled by src/ingest_boxscores.py.
+
+      - name: lineups
+        description: >
+          On-court five-man stints per game, written by src/build_lineups.py.
+          Lineup reconstruction is a sequential walk so it stays in Python; this
+          table is its output, ready for possession/RAPM models to build on.
+
       - name: team_ratings
         description: >
           Pre-game Elo rating per team per game, written by src/build_team_ratings.py.
