@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent for the daily data refresh. See deploy/README.md for install.
+  Edit the two absolute paths below if the repo does not live at this location;
+  launchd does not expand ~, so they must be literal.
+
+  Runs once a day at 09:00. If the Mac is asleep at 09:00, launchd runs the job
+  at the next wake, so a closed laptop just refreshes whenever it next opens.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.knicks-win-probability.refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/ezra.gregg/Desktop/Portfolio/knicks-win-probability/scripts/refresh.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/ezra.gregg/Desktop/Portfolio/knicks-win-probability/refresh.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/ezra.gregg/Desktop/Portfolio/knicks-win-probability/refresh.log</string>
+</dict>
+</plist>
