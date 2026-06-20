@@ -65,6 +65,43 @@ def main() -> None:
                 from dim_teams
             ) TO '{OUT_DIR / "teams.parquet"}' (FORMAT parquet)
         """)
+
+        # Each team's current roster value: sum the season value of the players
+        # in that team's most recent game. The serving proxy for a pre-game
+        # roster (we can't know who'll dress), so a trade reprices it once the
+        # new player appears in a box score. ~30 rows. Skipped if no box scores.
+        if con.execute("select count(*) from boxscores").fetchone()[0]:
+            con.execute(f"""
+                COPY (
+                    with appearances as (
+                        select b.team, b.game_id, b.person_id, g.season, g.game_date
+                        from stg_boxscores b
+                        join games g on b.game_id = g.game_id
+                        where b.minutes is not null and b.minutes <> ''
+                    ),
+                    latest as (
+                        select team, game_id, season from (
+                            select team, game_id, season, game_date,
+                                   row_number() over (
+                                       partition by team order by game_date desc
+                                   ) as rn
+                            from (select distinct team, game_id, season, game_date
+                                  from appearances)
+                        ) where rn = 1
+                    ),
+                    roster as (
+                        select l.team, l.season, a.person_id
+                        from latest l
+                        join appearances a
+                            on a.team = l.team and a.game_id = l.game_id
+                    )
+                    select r.team, sum(pv.value) as roster_value
+                    from roster r
+                    join player_value_seasons pv
+                        on pv.season = r.season and pv.person_id = r.person_id
+                    group by r.team
+                ) TO '{OUT_DIR / "current_roster_value.parquet"}' (FORMAT parquet)
+            """)
     finally:
         con.close()
 

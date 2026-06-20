@@ -8,6 +8,10 @@ features as (
 
 ratings as (
     select game_id, rating_diff from {{ ref('stg_team_ratings') }}
+),
+
+roster as (
+    select game_id, roster_value_diff from {{ ref('int_game_roster_value') }}
 )
 
 select
@@ -23,6 +27,10 @@ select
     f.is_overtime,
     f.is_playoff,
     r.rating_diff,
+    -- Null for games without a box score (older seasons, until that pull runs).
+    -- A left join keeps every training row; XGBoost handles the missing values.
+    rv.roster_value_diff,
     f.home_won
 from features f
 inner join ratings r on f.game_id = r.game_id
+left join roster rv on f.game_id = rv.game_id

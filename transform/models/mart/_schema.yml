@@ -78,3 +78,16 @@ models:
         tests: [not_null]
       - name: fgm
         tests: [not_null]
+
+  - name: player_value_seasons
+    description: >
+      Interim per-player season value (average Game Score) from the box score,
+      one row per player/season. Placeholder the roster-value feature consumes;
+      a learned RAPM value swaps in behind the same (season, person_id, value).
+    columns:
+      - name: season
+        tests: [not_null]
+      - name: person_id
+        tests: [not_null]
+      - name: value
+        tests: [not_null]
