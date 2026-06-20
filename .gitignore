@@ -35,3 +35,6 @@ transform/.user.yml
 
 # Personal learning notes - kept local, not part of the public portfolio
 docs/ml-lesson.md
+
+# Automated refresh job log
+refresh.log

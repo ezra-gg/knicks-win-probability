@@ -86,3 +86,9 @@ pipeline: load
 full:
     just ingest
     just pipeline
+
+# Scheduled refresh: rebuild + publish only if the season has new games. Runs
+# the cheap freshness check first, then `just full` and a push to main. Wired
+# to launchd for a daily cron (see deploy/ for the LaunchAgent).
+refresh:
+    ./scripts/refresh.sh
