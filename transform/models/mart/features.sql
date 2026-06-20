@@ -37,6 +37,10 @@ final as (
         -- coalesce to 0 rather than leaking a null into the model.
         coalesce(f.score_home_filled, 0)
             - coalesce(f.score_away_filled, 0)     as score_diff,
+        -- The running totals themselves (not used by the model, which only sees
+        -- the differential) so the replay can show the live scoreboard on hover.
+        coalesce(f.score_home_filled, 0)           as score_home,
+        coalesce(f.score_away_filled, 0)           as score_away,
         case when f.period > 4 then 1 else 0 end   as is_overtime,
         -- Parse PT12M00.00S into seconds left in the game. In regulation that is
         -- this period's clock plus the full quarters after it. In OT it is just
