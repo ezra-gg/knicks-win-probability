@@ -93,6 +93,7 @@ pipeline: load
 #   nohup caffeinate -i just full > run.log 2>&1 &
 full:
     just ingest
+    just ingest-boxscores
     just pipeline
 
 # Scheduled refresh: rebuild + publish only if the season has new games. Runs
