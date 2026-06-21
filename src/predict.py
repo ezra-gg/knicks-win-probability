@@ -18,6 +18,8 @@ from pathlib import Path
 import pandas as pd
 from xgboost import XGBClassifier
 
+from serving_data import serving_file, serving_model
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -108,12 +110,20 @@ def load_current_roster_value(path: Path = DEFAULT_ROSTER_VALUE_PATH) -> dict[st
 class MatchupPredictor:
     """Holds the model and current team state; predicts for any matchup + state."""
 
-    def __init__(self, model_path: Path = DEFAULT_MODEL_PATH,
-                 ratings_path: Path = DEFAULT_RATINGS_PATH,
-                 roster_value_path: Path = DEFAULT_ROSTER_VALUE_PATH):
-        self.model, self.features = load_model(model_path)
-        self.ratings = load_current_ratings(ratings_path)
-        self.roster_value = load_current_roster_value(roster_value_path)
+    def __init__(self, model_path: Path | None = None,
+                 ratings_path: Path | None = None,
+                 roster_value_path: Path | None = None):
+        # Default to the release-or-snapshot serving artifacts; an explicit path
+        # (tests, custom runs) bypasses that and loads directly.
+        model = model_path or serving_model(
+            DEFAULT_MODEL_PATH, features_path(DEFAULT_MODEL_PATH))
+        ratings = ratings_path or serving_file(
+            "current_ratings.parquet", DEFAULT_RATINGS_PATH)
+        roster = roster_value_path or serving_file(
+            "current_roster_value.parquet", DEFAULT_ROSTER_VALUE_PATH)
+        self.model, self.features = load_model(model)
+        self.ratings = load_current_ratings(ratings)
+        self.roster_value = load_current_roster_value(roster)
 
     def win_probability(self, home_team: str, away_team: str,
                         seconds_remaining: float = REGULATION_SECONDS,
@@ -160,8 +170,10 @@ def main() -> None:
                         help="seconds remaining in regulation (default: full game)")
     parser.add_argument("--margin", type=int, default=0,
                         help="home score minus away score right now (default: 0)")
-    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
-    parser.add_argument("--ratings", type=Path, default=DEFAULT_RATINGS_PATH)
+    parser.add_argument("--model", type=Path, default=None,
+                        help="model path; default resolves the release-or-snapshot artifact")
+    parser.add_argument("--ratings", type=Path, default=None,
+                        help="ratings path; default resolves the release-or-snapshot artifact")
     args = parser.parse_args()
 
     predictor = MatchupPredictor(args.model, args.ratings)
