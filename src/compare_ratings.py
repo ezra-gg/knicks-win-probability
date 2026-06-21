@@ -22,6 +22,7 @@ import argparse
 import logging
 import re
 import time
+from functools import lru_cache
 from io import StringIO
 from pathlib import Path
 
@@ -52,8 +53,14 @@ BREF_SLEEP = 3.0  # Basketball-Reference asks for slow, polite scraping
 # mapping comes from dbt's conformed dim_teams (built from the seeds), read here
 # via its serving export - the single source of truth, no raw seed paths in code.
 TEAMS_PARQUET = PROJECT_ROOT / "data" / "serving" / "teams.parquet"
-_teams = pd.read_parquet(TEAMS_PARQUET)
-CANON = dict(zip(_teams["tricode"], _teams["canonical_tricode"]))
+
+
+@lru_cache(maxsize=1)
+def canon_map() -> dict[str, str]:
+    """Tricode -> canonical current code. Loaded lazily (and cached) so importing
+    this module does not require the serving export to exist."""
+    teams = pd.read_parquet(TEAMS_PARQUET)
+    return dict(zip(teams["tricode"], teams["canonical_tricode"]))
 
 # Build name/id lookups from nba_api's static list, then add the names
 # Basketball-Reference uses that the static list does not match.
@@ -92,7 +99,7 @@ def our_season_end_ratings(ratings_path: Path) -> pd.DataFrame:
     long = pd.concat([home, away], ignore_index=True)
     last = long.sort_values("game_date").groupby(["season", "team"], as_index=False).tail(1)
     last["season_end_year"] = last["season"].str[:4].astype(int) + 1
-    last["team"] = last["team"].replace(CANON)
+    last["team"] = last["team"].replace(canon_map())
     return last[["season_end_year", "team", "rating"]]
 
 

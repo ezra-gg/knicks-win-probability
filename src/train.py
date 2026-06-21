@@ -19,14 +19,16 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, log_loss
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
 from config import PARAMS
 from predict import save_model
 
-# Either model satisfies the same interface we use (predict_proba), so the
-# evaluation and sanity-check helpers accept both.
-Model = LogisticRegression | XGBClassifier
+# Each satisfies the same interface we use (predict_proba), so the evaluation
+# and sanity-check helpers accept any. The baseline is a scaler+logistic pipeline.
+Model = Pipeline | XGBClassifier
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,16 +91,18 @@ def split_by_time(df: pd.DataFrame, holdout_seasons: list[str]) -> tuple[pd.Data
     return train_df, holdout_df
 
 
-def fit_baseline(train_df: pd.DataFrame) -> LogisticRegression:
-    """Fit a logistic regression on the four features.
+def fit_baseline(train_df: pd.DataFrame) -> Pipeline:
+    """Fit a standardized logistic regression on the features.
 
-    max_iter is bumped from the default 100 because the solver sometimes needs
-    more passes to converge on real data; otherwise it warns and stops early.
+    The features span very different scales (seconds_remaining 0-2880 vs the 0/1
+    flags), so a StandardScaler goes first - otherwise L2 penalizes coefficients
+    unequally by scale and handicaps the baseline. max_iter is bumped from the
+    default 100 because the solver sometimes needs more passes to converge.
     """
     X_train = train_df[FEATURES]
     y_train = train_df[LABEL]
     log.info("Fitting logistic regression on %d rows ...", len(X_train))
-    model = LogisticRegression(max_iter=1000)
+    model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
     model.fit(X_train, y_train)
     return model
 
@@ -139,6 +143,11 @@ def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float,
     the model beats always-predict-the-base-rate (the "knows nothing" baseline).
     label names the slice being evaluated (e.g. "full holdout", "first quarter").
     """
+    if holdout_df.empty:
+        # A slice can be empty (e.g. a holdout window with no playoff games);
+        # log_loss on empty arrays would raise and abort the run.
+        log.info("Evaluation - %s: no plays in this slice, skipping.", label)
+        return
     y_true = holdout_df[LABEL]
     probs = model.predict_proba(holdout_df[FEATURES])[:, 1]
     baseline = np.full(len(y_true), base_rate)  # constant base-rate prediction
