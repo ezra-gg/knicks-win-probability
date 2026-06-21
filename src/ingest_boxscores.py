@@ -127,6 +127,9 @@ def pull_boxscores(
         buffer = []
 
     progress_every = max(1, len(todo) // 100)
+    # Announce the start so a long, quiet first batch does not look like a hang.
+    log.info("Ingest started: fetching %d game(s). Progress will log every %d games.",
+             len(todo), progress_every)
     for i, game_id in enumerate(todo, start=1):
         df = _fetch_with_retry(game_id)
         if df is not None and not df.empty:
