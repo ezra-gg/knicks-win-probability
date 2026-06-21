@@ -104,6 +104,9 @@ def main() -> None:
                         on rapm.season = r.season and rapm.person_id = r.person_id
                     left join player_value_seasons box
                         on box.season = r.season and box.person_id = r.person_id
+                    -- Only the 30 current teams; defunct tricodes (a relocated
+                    -- franchise's last roster) would otherwise linger here.
+                    where r.team in (select tricode from dim_teams where is_current)
                     group by r.team
                 ) TO '{OUT_DIR / "current_roster_value.parquet"}' (FORMAT parquet)
             """)
