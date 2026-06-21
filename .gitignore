@@ -13,6 +13,10 @@ data/raw/*.csv
 data/raw/*.parquet
 data/*.parquet
 
+# Serving artifacts downloaded from the GitHub Release at runtime (the committed
+# snapshot under data/serving/ is the offline fallback).
+data/_serving_cache/
+
 # DuckDB database file - regenerable from the raw CSVs via src/load_duckdb.py
 data/*.duckdb
 data/*.duckdb.wal

@@ -7,8 +7,9 @@
 # Built for launchd/cron on a residential machine - stats.nba.com blocks cloud
 # IPs, so this cannot run on GitHub Actions. Idempotent: safe to run any time.
 #
-# NOTE: step 3 pushes straight to main. The branch ruleset must allow this
-# account to bypass the pull-request requirement, or the push is rejected.
+# NOTE: step 3 uploads to the `serving-latest` GitHub Release (no git commit), so
+# `gh` must be authenticated. Create the release once: `gh release create
+# serving-latest --notes "live serving artifacts"`.
 set -euo pipefail
 
 # launchd/cron start with a minimal PATH; add the dirs holding just, git, etc.
@@ -45,12 +46,18 @@ fi
 log "New games found; running full pipeline..."
 just full
 
-# 3. Publish the refreshed serving artifacts + model so Community Cloud redeploys.
-git add data/serving/*.parquet models/win_probability.json models/win_probability_features.json
-if git diff --cached --quiet; then
-    log "Pipeline ran but artifacts unchanged; nothing to publish."
-    exit 0
-fi
-git commit -m "Automated data refresh $(date '+%Y-%m-%d')"
-git push origin main
-log "Published refreshed artifacts; Community Cloud will redeploy."
+# 3. Publish the refreshed serving artifacts to the GitHub Release the app reads.
+#    No git commit: the app fetches the release (within its cache TTL), so the
+#    daily binary churn never enters git history. The committed snapshot stays as
+#    the offline fallback - refresh it occasionally with a manual commit if you
+#    want clones to ship recent data.
+log "Uploading serving artifacts to the serving-latest release..."
+gh release upload serving-latest --clobber \
+    data/serving/current_ratings.parquet \
+    data/serving/games.parquet \
+    data/serving/replay.parquet \
+    data/serving/teams.parquet \
+    data/serving/current_roster_value.parquet \
+    models/win_probability.json \
+    models/win_probability_features.json
+log "Published to the release; the live app picks it up within its cache TTL."
