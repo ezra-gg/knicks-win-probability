@@ -93,16 +93,16 @@ def load_current_ratings(ratings_path: Path = DEFAULT_RATINGS_PATH) -> dict[str,
     return dict(zip(df["team"], df["rating"]))
 
 
-def load_current_roster_value(path: Path = DEFAULT_ROSTER_VALUE_PATH) -> dict[str, float]:
-    """Each team's current summed roster value, keyed by tricode.
+def load_current_roster_value(path: Path = DEFAULT_ROSTER_VALUE_PATH) -> dict[str, tuple[float, float]]:
+    """Each team's current summed roster value as (rapm, box), keyed by tricode.
 
-    Empty when the export is absent (box scores not pulled yet); the feature is
-    then served as missing, which the model handles like any other null.
+    Empty when the export is absent (box scores not pulled yet); the features are
+    then served as neutral, which the model handles like any other unknown.
     """
     if not path.exists():
         return {}
     df = pd.read_parquet(path)
-    return dict(zip(df["team"], df["roster_value"]))
+    return {r.team: (r.roster_rapm, r.roster_box) for r in df.itertuples(index=False)}
 
 
 class MatchupPredictor:
@@ -129,16 +129,17 @@ class MatchupPredictor:
             return decided
 
         # The two teams enter the model through their Elo gap and, when box scores
-        # are available, the gap in their current rosters' summed value. The
-        # serving roster is the latest game's players (the best pre-game proxy);
-        # 0 (neutral) when either team's value is unknown, matching how training
-        # fills the rare game without a box score.
+        # are available, the gap in their current rosters' value - both the learned
+        # RAPM and the box-score (Game Score) sums. The serving roster is the latest
+        # game's players (the best pre-game proxy); 0 (neutral) when a team's value
+        # is unknown, matching how training fills the rare game without a box score.
         rating_diff = self.ratings[home_team] - self.ratings[away_team]
-        home_rv = self.roster_value.get(home_team)
-        away_rv = self.roster_value.get(away_team)
-        roster_value_diff = (home_rv - away_rv
-                             if home_rv is not None and away_rv is not None
-                             else 0.0)
+        home_rapm, home_box = self.roster_value.get(home_team, (None, None))
+        away_rapm, away_box = self.roster_value.get(away_team, (None, None))
+        roster_value_diff = (home_rapm - away_rapm
+                             if home_rapm is not None and away_rapm is not None else 0.0)
+        roster_value_box_diff = (home_box - away_box
+                                 if home_box is not None and away_box is not None else 0.0)
         row = pd.DataFrame([{
             "seconds_remaining": seconds_remaining,
             "score_diff": score_diff,
@@ -146,6 +147,7 @@ class MatchupPredictor:
             "is_playoff": is_playoff,
             "rating_diff": rating_diff,
             "roster_value_diff": roster_value_diff,
+            "roster_value_box_diff": roster_value_box_diff,
         }])[self.features]
         return float(self.model.predict_proba(row)[:, 1][0])
 

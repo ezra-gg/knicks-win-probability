@@ -157,12 +157,12 @@ def evaluate(model: Model, holdout_df: pd.DataFrame, base_rate: float,
 
 def win_prob(model: Model, seconds_remaining: float, score_diff: float,
              is_overtime: int, rating_diff: float, is_playoff: int = 0,
-             roster_value_diff: float = 0.0) -> float:
+             roster_value_diff: float = 0.0, roster_value_box_diff: float = 0.0) -> float:
     """Predict P(home win) for a single hand-built game state.
 
     Built by feature name and reindexed to FEATURES, so it stays correct
-    regardless of the column order the model was trained on. roster_value_diff
-    defaults to 0 (evenly matched rosters), like rating_diff in the checks below.
+    regardless of the column order the model was trained on. The roster gaps
+    default to 0 (evenly matched rosters), like rating_diff in the checks below.
     """
     state = pd.DataFrame([{
         "seconds_remaining": seconds_remaining,
@@ -171,6 +171,7 @@ def win_prob(model: Model, seconds_remaining: float, score_diff: float,
         "is_playoff": is_playoff,
         "rating_diff": rating_diff,
         "roster_value_diff": roster_value_diff,
+        "roster_value_box_diff": roster_value_box_diff,
     }])[FEATURES]
     return float(model.predict_proba(state)[:, 1][0])
 

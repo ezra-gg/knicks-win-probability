@@ -10,21 +10,27 @@ the model should be measured against these:
 
 | Metric | Logistic (baseline) | XGBoost (shipped) |
 | ------ | ------------------- | ----------------- |
-| Log loss | 0.4740 | 0.4558 |
-| Brier | 0.1579 | 0.1525 |
-| Brier skill score | 0.366 | 0.388 |
+| Log loss | 0.4560 | 0.4403 |
+| Brier | 0.1513 | 0.1462 |
+| Brier skill score | 0.393 | 0.413 |
 
 Holdout is 2024-25 and 2025-26, regular season + playoffs (~33k games total).
 Broken down by game type on the XGBoost model:
 
 | Slice | BSS |
 | ----- | --- |
-| Regular season | 0.394 |
-| Playoffs | 0.296 |
+| Regular season | 0.422 |
+| Playoffs | 0.293 |
 
 The playoff gap is expected - higher-variance games between evenly matched teams.
-XGBoost early-stops around 162-181 trees. The sanity gate must stay green: tied at
-tip-off ~0.56, up 20 with 10s left ~0.997, down 3 with 5s left ~0.089.
+XGBoost early-stops around 197 trees. The sanity gate must stay green: tied at
+tip-off ~0.57, up 20 with 10s left ~0.996, down 3 with 5s left ~0.11.
+
+The model sees seven features: clock, score margin, OT and playoff flags, the Elo
+gap (`rating_diff`), and two roster-strength gaps - learned RAPM
+(`roster_value_diff`) and box-score Game Score (`roster_value_box_diff`). The two
+roster features are complementary: adding RAPM lifts BSS from 0.387 (Elo only) to
+~0.41, and Game Score adds a further ~0.005 on top by stabilizing RAPM's noise.
 
 ## Where configuration lives
 
