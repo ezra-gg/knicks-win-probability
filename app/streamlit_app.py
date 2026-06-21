@@ -21,26 +21,30 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from predict import (  # noqa: E402
     MatchupPredictor,
     endgame_certainty,
+    features_path,
     game_state_seconds,
     load_model,
 )
+from serving_data import serving_file, serving_model  # noqa: E402
 
-# The app reads only these committed serving artifacts - no DuckDB, no pipeline.
+# Serving artifacts come from the release-or-snapshot loader - no DuckDB, no
+# pipeline. The committed snapshot below is the offline fallback. The caches use
+# a TTL so the live app picks up the daily release refresh without a redeploy.
+CACHE_TTL = 6 * 3600
 MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
-RATINGS_PATH = PROJECT_ROOT / "data" / "serving" / "current_ratings.parquet"
 GAMES_PATH = PROJECT_ROOT / "data" / "serving" / "games.parquet"
 REPLAY_PATH = PROJECT_ROOT / "data" / "serving" / "replay.parquet"
 TEAMS_PATH = PROJECT_ROOT / "data" / "serving" / "teams.parquet"
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL)
 def teams_dim() -> pd.DataFrame:
     """The conformed team dimension (tricode, canonical_tricode, full_name,
     is_current), exported from dbt's dim_teams - the single source of truth."""
-    return pd.read_parquet(TEAMS_PATH)
+    return pd.read_parquet(serving_file("teams.parquet", TEAMS_PATH))
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL)
 def _name_map() -> dict[str, str]:
     df = teams_dim()
     return dict(zip(df["tricode"], df["full_name"]))
@@ -51,24 +55,25 @@ def name(tricode: str) -> str:
     return _name_map().get(tricode, tricode)
 
 
-@st.cache_resource
+@st.cache_resource(ttl=CACHE_TTL)
 def get_model():
-    return load_model(MODEL_PATH)
+    return load_model(serving_model(MODEL_PATH, features_path(MODEL_PATH)))
 
 
-@st.cache_resource
+@st.cache_resource(ttl=CACHE_TTL)
 def get_predictor() -> MatchupPredictor:
-    return MatchupPredictor(MODEL_PATH, RATINGS_PATH)
+    return MatchupPredictor()
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL)
 def all_games() -> pd.DataFrame:
-    return pd.read_parquet(GAMES_PATH).sort_values("game_date", ascending=False)
+    return pd.read_parquet(serving_file("games.parquet", GAMES_PATH)).sort_values(
+        "game_date", ascending=False)
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL)
 def all_replay() -> pd.DataFrame:
-    return pd.read_parquet(REPLAY_PATH)
+    return pd.read_parquet(serving_file("replay.parquet", REPLAY_PATH))
 
 
 def list_games(team: str | None) -> pd.DataFrame:
