@@ -1,6 +1,13 @@
 # Single source of truth for tunable parameters.
 # Loaded by src/config.py; edit here rather than hunting through the code.
 
+# Player RAPM - regularized adjusted plus-minus (src/build_rapm.py)
+rapm:
+  # Ridge strength. Higher shrinks player values toward 0; RAPM needs heavy
+  # regularization because teammates are collinear. Tune by the spread of values
+  # (stars land a few points above average, not double digits).
+  ridge_alpha: 2000
+
 # Elo team-strength ratings (src/build_team_ratings.py)
 elo:
   base_rating: 1500   # anchor every team starts at; arbitrary, only gaps matter
@@ -17,7 +24,8 @@ model:
     - is_overtime
     - is_playoff
     - rating_diff
-    - roster_value_diff   # null until the box-score pull runs; XGBoost handles it
+    - roster_value_diff       # learned RAPM roster gap (complementary to the box one)
+    - roster_value_box_diff   # box-score (Game Score) roster gap; stabilizes RAPM's noise
   label: home_won
 
   # Three-way time split. The actual seasons are derived from the data; these

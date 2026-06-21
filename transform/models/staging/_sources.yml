@@ -31,6 +31,15 @@ sources:
           Lineup reconstruction is a sequential walk so it stays in Python; this
           table is its output, ready for possession/RAPM models to build on.
 
+      - name: player_rapm
+        description: >
+          Per-season learned player value (regularized adjusted plus-minus),
+          written by src/build_rapm.py from the reconstructed possessions. The
+          ridge regression stays in Python; this table is its output.
+        columns:
+          - name: value
+            tests: [not_null]
+
       - name: team_ratings
         description: >
           Pre-game Elo rating per team per game, written by src/build_team_ratings.py.

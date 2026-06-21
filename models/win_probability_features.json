@@ -4,6 +4,8 @@
     "score_diff",
     "is_overtime",
     "is_playoff",
-    "rating_diff"
+    "rating_diff",
+    "roster_value_diff",
+    "roster_value_box_diff"
   ]
 }

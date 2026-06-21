@@ -95,10 +95,15 @@ def main() -> None:
                         join appearances a
                             on a.team = l.team and a.game_id = l.game_id
                     )
-                    select r.team, sum(pv.value) as roster_value
+                    select
+                        r.team,
+                        sum(rapm.value) as roster_rapm,
+                        sum(box.value)  as roster_box
                     from roster r
-                    join player_value_seasons pv
-                        on pv.season = r.season and pv.person_id = r.person_id
+                    left join stg_player_rapm rapm
+                        on rapm.season = r.season and rapm.person_id = r.person_id
+                    left join player_value_seasons box
+                        on box.season = r.season and box.person_id = r.person_id
                     group by r.team
                 ) TO '{OUT_DIR / "current_roster_value.parquet"}' (FORMAT parquet)
             """)
