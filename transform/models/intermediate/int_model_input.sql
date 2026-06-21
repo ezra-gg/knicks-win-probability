@@ -11,7 +11,7 @@ ratings as (
 ),
 
 roster as (
-    select game_id, roster_value_diff from {{ ref('int_game_roster_value') }}
+    select game_id, roster_value_diff, roster_value_box_diff from {{ ref('int_game_roster_value') }}
 )
 
 select
@@ -30,7 +30,8 @@ select
     -- 0 (neutral) for the rare game without a usable box score - the left join
     -- keeps every training row, and 0 means "roster gap unknown, assume even".
     -- Also keeps the logistic baseline happy: it can't accept NaN like XGBoost.
-    coalesce(rv.roster_value_diff, 0) as roster_value_diff,
+    coalesce(rv.roster_value_diff, 0)     as roster_value_diff,
+    coalesce(rv.roster_value_box_diff, 0) as roster_value_box_diff,
     f.home_won
 from features f
 inner join ratings r on f.game_id = r.game_id

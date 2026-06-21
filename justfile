@@ -38,6 +38,10 @@ ratings:
 lineups:
     ./scripts/lineups.sh
 
+# Build per-season player RAPM from possessions (writes parquet + DuckDB table)
+rapm:
+    ./scripts/rapm.sh
+
 # Compare our Elo to Net Rating and SRS benchmarks
 compare *args:
     ./scripts/compare.sh {{args}}
@@ -81,15 +85,19 @@ _require-boxscores:
 rebuild: _require-boxscores load
     just dbt build
 
-# Rebuild everything WITHOUT pulling new data. Two-phase because the Python Elo
-# step sits in the middle of the dbt DAG: it reads int_roster_continuity and
-# writes team_ratings, which later models depend on.
-#   1. build continuity (+ its upstream) so ratings can read it
-#   2. run the Elo ratings (writes the team_ratings table)
-#   3. full dbt build of the ratings-dependent models, then train
+# Rebuild everything WITHOUT pulling new data. Three Python steps sit inside the
+# dbt DAG (Elo, lineups, RAPM), each reading dbt models and writing a table later
+# models depend on, so the build is interleaved:
+#   1. build continuity + box-score staging (inputs to Elo and lineups)
+#   2. Elo ratings and lineup reconstruction (write team_ratings, lineups)
+#   3. build possessions (needs lineups), then RAPM (needs possessions)
+#   4. full dbt build of the dependent models, then train + export
 pipeline: _require-boxscores load
-    just dbt build -s +int_roster_continuity
+    just dbt build -s +int_roster_continuity +stg_boxscores
     just ratings
+    just lineups
+    just dbt build -s +int_possessions
+    just rapm
     just dbt build
     just train
     just export
