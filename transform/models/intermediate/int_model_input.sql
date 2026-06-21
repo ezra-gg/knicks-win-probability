@@ -27,9 +27,10 @@ select
     f.is_overtime,
     f.is_playoff,
     r.rating_diff,
-    -- Null for games without a box score (older seasons, until that pull runs).
-    -- A left join keeps every training row; XGBoost handles the missing values.
-    rv.roster_value_diff,
+    -- 0 (neutral) for the rare game without a usable box score - the left join
+    -- keeps every training row, and 0 means "roster gap unknown, assume even".
+    -- Also keeps the logistic baseline happy: it can't accept NaN like XGBoost.
+    coalesce(rv.roster_value_diff, 0) as roster_value_diff,
     f.home_won
 from features f
 inner join ratings r on f.game_id = r.game_id

@@ -131,13 +131,14 @@ class MatchupPredictor:
         # The two teams enter the model through their Elo gap and, when box scores
         # are available, the gap in their current rosters' summed value. The
         # serving roster is the latest game's players (the best pre-game proxy);
-        # nan when either team's value is unknown, which the model treats as missing.
+        # 0 (neutral) when either team's value is unknown, matching how training
+        # fills the rare game without a box score.
         rating_diff = self.ratings[home_team] - self.ratings[away_team]
         home_rv = self.roster_value.get(home_team)
         away_rv = self.roster_value.get(away_team)
         roster_value_diff = (home_rv - away_rv
                              if home_rv is not None and away_rv is not None
-                             else float("nan"))
+                             else 0.0)
         row = pd.DataFrame([{
             "seconds_remaining": seconds_remaining,
             "score_diff": score_diff,
