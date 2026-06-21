@@ -14,6 +14,8 @@ from pathlib import Path
 
 import duckdb
 
+from config import PARAMS
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-7s  %(message)s",
                     datefmt="%H:%M:%S")
 log = logging.getLogger("export_serving_data")
@@ -21,14 +23,23 @@ log = logging.getLogger("export_serving_data")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "nba.duckdb"
 OUT_DIR = PROJECT_ROOT / "data" / "serving"
-HOLDOUT_SEASONS = ("2024-25", "2025-26")
+N_HOLDOUT = PARAMS["model"]["n_holdout"]
+
+
+def holdout_seasons(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """The most recent N_HOLDOUT seasons in the data - the same window train.py
+    holds out. Derived (not hardcoded) so the replay export slides forward with
+    the season automatically and stays genuinely out-of-sample."""
+    seasons = [r[0] for r in con.execute(
+        "select distinct season from games order by season").fetchall()]
+    return seasons[-N_HOLDOUT:]
 
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    seasons = "', '".join(HOLDOUT_SEASONS)
     con = duckdb.connect(str(DEFAULT_DB_PATH), read_only=True)
     try:
+        seasons = "', '".join(holdout_seasons(con))
         # Each team's current Elo (latest pre-game rating). ~30 rows.
         con.execute(f"""
             COPY (
@@ -50,10 +61,19 @@ def main() -> None:
             ) TO '{OUT_DIR / "games.parquet"}' (FORMAT parquet)
         """)
 
-        # Per-play features for replay, holdout seasons only.
+        # Per-play features for replay, holdout seasons only. Downsampled to the
+        # last action in each ~10-second game-clock bucket: a win-probability
+        # curve is visually identical at that resolution, and it keeps this
+        # committed-and-refreshed file (and its daily git churn) several times
+        # smaller. Quarter boundaries and the final state are preserved.
         con.execute(f"""
             COPY (
-                select * from int_model_input where season in ('{seasons}')
+                select * from int_model_input
+                where season in ('{seasons}')
+                qualify row_number() over (
+                    partition by game_id, period, cast(seconds_remaining / 10 as integer)
+                    order by action_number desc
+                ) = 1
             ) TO '{OUT_DIR / "replay.parquet"}' (FORMAT parquet)
         """)
 
@@ -104,6 +124,9 @@ def main() -> None:
                         on rapm.season = r.season and rapm.person_id = r.person_id
                     left join player_value_seasons box
                         on box.season = r.season and box.person_id = r.person_id
+                    -- Only the 30 current teams; defunct tricodes (a relocated
+                    -- franchise's final roster) would otherwise linger here.
+                    where r.team in (select tricode from dim_teams where is_current)
                     group by r.team
                 ) TO '{OUT_DIR / "current_roster_value.parquet"}' (FORMAT parquet)
             """)

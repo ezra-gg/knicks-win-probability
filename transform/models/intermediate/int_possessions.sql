@@ -63,4 +63,7 @@ inner join scored b on b.game_id = s.game_id and b.action_number = s.start_actio
 inner join scored e on e.game_id = s.game_id and e.action_number = s.end_action
 where s.home_lineup is not null
   and s.away_lineup is not null
-  and b.clock_sec - e.clock_sec > 0
+  -- At least 5 seconds of exposure. Sub-second stints are clock/score-boundary
+  -- artifacts (a margin attributed to ~0 time blows up margin-per-100); a floor
+  -- drops them before they reach the RAPM target.
+  and b.clock_sec - e.clock_sec >= 5

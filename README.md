@@ -44,12 +44,16 @@ Requires Python 3.12+. To regenerate everything from source:
 # 1. Set up the virtual environment and install dependencies
 ./scripts/setup.sh
 
-# 2. Pull data (game index + play-by-play) through the current season
-./scripts/ingest.sh --start-season 2023-24
+# 2. Pull data through the current season: game index + play-by-play, then the
+#    box scores the player-value models need (both default to 2000-01 onward)
+just ingest
+just ingest-boxscores
 
 # 3. Load, build, rate, train, and export serving artifacts
 just pipeline
 ```
+
+Or run the whole thing - pull, rebuild, retrain, export - with `just full`.
 
 Re-running `ingest.sh` is incremental. It skips games already on disk and only
 fetches what's new, so it's safe to interrupt and resume.
@@ -62,8 +66,8 @@ fetches what's new, so it's safe to interrupt and resume.
 - [x] Team strength ratings (Elo, validated against Net Rating and SRS)
 - [x] Model training and calibration (logistic baseline + XGBoost)
 - [x] Matchup predictor + Streamlit app (overview, matchup drill-down, game replay)
+- [x] Player-aware team strength (learned RAPM + box-score roster value)
 - [ ] Live game listener (stream an in-progress game, update the curve in real time)
-- [ ] Player-aware team strength (see "Down the road")
 
 See [docs/RUNBOOK.md](docs/RUNBOOK.md) to run the pipeline and
 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) to keep it healthy.
@@ -76,32 +80,30 @@ in real time - turning the game-replay view into a live scoreboard. The
 `MatchupPredictor` is already built to be called once per update; the listener is
 the piece that feeds it live state.
 
-A few further directions I want to explore now that the core model works:
+### Shipped: player-aware team strength
 
-- **Roster-aware season transitions (in progress).** Instead of carrying a team's
-  Elo into the next season unchanged, regress it toward the mean by how much of the
-  roster turned over. Continuity is the fraction of last season's scoring production
-  that returned (`int_roster_continuity`), so a gutted team drops and a team that kept
-  its core does not. A first version weighted by scoring share is being built; the
-  richer player-value version below is the natural successor.
-- **Learned player value (RAPM).** Scoring share is an offense-only proxy: it misses
-  defenders and playmakers. The plan is to learn each player's value from outcomes
-  rather than the box score, with **Regularized Adjusted Plus-Minus** - regress
-  possession point-differential on which five players are on the court, so a player
-  who never scores but tilts the game still earns credit. The build:
-  1. Reconstruct five-man lineups from the play-by-play substitution events (already
-     ingested; ~1.3M of them).
-  2. Compute RAPM per player per season - our own values, all 26 seasons, one
-     consistent measure (no historical coverage gap).
-  3. Validate against the NBA's official player-tracking metrics (2013-14+) as a
-     convergent-validity check, the same way our Elo was checked against Net Rating
-     and SRS. A sanity test, not a feature source.
-  4. Optionally feed the official tracking metrics in as supplementary features for
-     the seasons they cover; XGBoost handles their absence in older seasons natively,
-     and the holdout sits entirely in the tracked era. Run as a measured experiment.
-- **Player-aware team strength.** With per-player values in hand, build team strength
-  as the current roster's summed value instead of one franchise Elo number, so a
-  mid-season trade reprices the team immediately.
+Team Elo is a lagging, team-level signal - it can't react to a mid-season trade
+until results pile up. So the model now also sees each team's **current roster**:
+
+1. **On-court lineups** are reconstructed from box-score starters + play-by-play
+   substitutions (`build_lineups.py`), validated to ~0.99 correlation against
+   official box-score minutes.
+2. **Learned player value (RAPM)** - a ridge regression of stint point-margin on
+   which ten players are on the floor (`build_rapm.py`), so a defender who never
+   scores still earns credit. SGA and Giannis top the league, as they should.
+3. **Two roster-strength features** feed the model: the learned RAPM gap and a
+   box-score Game Score gap (they're complementary - RAPM is low-bias/noisy, Game
+   Score the reverse). Built from who actually appeared, so a traded player's value
+   follows them automatically. Holdout BSS: **0.387 (Elo only) -> 0.413**.
+
+Each step was gated on evidence: a near-free box-score proxy validated the
+hypothesis before the expensive RAPM compute. See
+[MAINTENANCE.md](docs/MAINTENANCE.md) for the metrics.
+
+A few further directions, now that this works:
+
+- **Validate RAPM** against the NBA's official player-tracking metrics (2013-14+),
+  the same convergent-validity check used for Elo. A sanity test, not a feature.
 - **Provisional ratings.** A faster-moving rating early in a team's history to cut
   down on cold-start noise in the earliest seasons.
 
