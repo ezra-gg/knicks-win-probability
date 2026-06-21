@@ -70,8 +70,15 @@ lint *args:
 
 # --- full pipeline ---
 
+# (internal) Fail fast with an actionable message if box scores were never
+# pulled - the model now depends on them, so a build without them dies on a
+# cryptic dbt "source not found" instead. Belongs to the build recipes below.
+_require-boxscores:
+    @test -f {{justfile_directory()}}/data/raw/boxscores.csv || \
+        { echo "Box scores not found. The model needs them now - run 'just ingest-boxscores' first." >&2; exit 1; }
+
 # Reload DuckDB from CSVs then run a full dbt build
-rebuild: load
+rebuild: _require-boxscores load
     just dbt build
 
 # Rebuild everything WITHOUT pulling new data. Two-phase because the Python Elo
@@ -80,7 +87,7 @@ rebuild: load
 #   1. build continuity (+ its upstream) so ratings can read it
 #   2. run the Elo ratings (writes the team_ratings table)
 #   3. full dbt build of the ratings-dependent models, then train
-pipeline: load
+pipeline: _require-boxscores load
     just dbt build -s +int_roster_continuity
     just ratings
     just dbt build
@@ -93,6 +100,7 @@ pipeline: load
 #   nohup caffeinate -i just full > run.log 2>&1 &
 full:
     just ingest
+    just ingest-boxscores
     just pipeline
 
 # Scheduled refresh: rebuild + publish only if the season has new games. Runs
