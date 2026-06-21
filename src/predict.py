@@ -27,8 +27,9 @@ log = logging.getLogger("predict")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "win_probability.json"
-# Serving reads the committed ratings export, not the full DuckDB.
+# Serving reads the committed exports, not the full DuckDB.
 DEFAULT_RATINGS_PATH = PROJECT_ROOT / "data" / "serving" / "current_ratings.parquet"
+DEFAULT_ROSTER_VALUE_PATH = PROJECT_ROOT / "data" / "serving" / "current_roster_value.parquet"
 
 REGULATION_SECONDS = 2880  # 4 x 12-minute quarters
 
@@ -92,13 +93,27 @@ def load_current_ratings(ratings_path: Path = DEFAULT_RATINGS_PATH) -> dict[str,
     return dict(zip(df["team"], df["rating"]))
 
 
+def load_current_roster_value(path: Path = DEFAULT_ROSTER_VALUE_PATH) -> dict[str, float]:
+    """Each team's current summed roster value, keyed by tricode.
+
+    Empty when the export is absent (box scores not pulled yet); the feature is
+    then served as missing, which the model handles like any other null.
+    """
+    if not path.exists():
+        return {}
+    df = pd.read_parquet(path)
+    return dict(zip(df["team"], df["roster_value"]))
+
+
 class MatchupPredictor:
-    """Holds the model and current ratings; predicts for any matchup + state."""
+    """Holds the model and current team state; predicts for any matchup + state."""
 
     def __init__(self, model_path: Path = DEFAULT_MODEL_PATH,
-                 ratings_path: Path = DEFAULT_RATINGS_PATH):
+                 ratings_path: Path = DEFAULT_RATINGS_PATH,
+                 roster_value_path: Path = DEFAULT_ROSTER_VALUE_PATH):
         self.model, self.features = load_model(model_path)
         self.ratings = load_current_ratings(ratings_path)
+        self.roster_value = load_current_roster_value(roster_value_path)
 
     def win_probability(self, home_team: str, away_team: str,
                         seconds_remaining: float = REGULATION_SECONDS,
@@ -113,14 +128,24 @@ class MatchupPredictor:
         if decided is not None:
             return decided
 
-        # The two teams enter the model only through their Elo gap.
+        # The two teams enter the model through their Elo gap and, when box scores
+        # are available, the gap in their current rosters' summed value. The
+        # serving roster is the latest game's players (the best pre-game proxy);
+        # 0 (neutral) when either team's value is unknown, matching how training
+        # fills the rare game without a box score.
         rating_diff = self.ratings[home_team] - self.ratings[away_team]
+        home_rv = self.roster_value.get(home_team)
+        away_rv = self.roster_value.get(away_team)
+        roster_value_diff = (home_rv - away_rv
+                             if home_rv is not None and away_rv is not None
+                             else 0.0)
         row = pd.DataFrame([{
             "seconds_remaining": seconds_remaining,
             "score_diff": score_diff,
             "is_overtime": is_overtime,
             "is_playoff": is_playoff,
             "rating_diff": rating_diff,
+            "roster_value_diff": roster_value_diff,
         }])[self.features]
         return float(self.model.predict_proba(row)[:, 1][0])
 
