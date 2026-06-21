@@ -209,8 +209,9 @@ def main() -> None:
         help="Explicit season(s), e.g. 2022-23 2023-24. If omitted, pulls "
              "--start-season through the current season.")
     parser.add_argument(
-        "--start-season", default="2023-24",
-        help="Earliest season when --seasons is not given (default: 2023-24).")
+        "--start-season", default="2000-01",
+        help="Earliest season when --seasons is not given (default: 2000-01, the "
+             "start of the modern play-by-play era).")
     parser.add_argument(
         "--season-types", nargs="+", default=["Regular Season", "Playoffs"],
         choices=["Regular Season", "Playoffs", "Pre Season", "All Star"],

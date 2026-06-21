@@ -48,6 +48,13 @@ RIDGE_ALPHA = float(PARAMS["rapm"]["ridge_alpha"])
 
 def fit_season(stints: pd.DataFrame) -> pd.DataFrame:
     """Ridge RAPM for one season: one coefficient (net per-100 impact) per player."""
+    # Each lineup must be exactly five ids; int_possessions' n_players = 5 filter
+    # guarantees it. Check explicitly - otherwise a stray lineup makes np.array
+    # ragged and fails cryptically far downstream rather than here.
+    sides = pd.concat([stints["home_lineup"], stints["away_lineup"]])
+    if not (sides.str.count("-") == 4).all():
+        raise ValueError("Found a lineup without exactly 5 players in int_possessions.")
+
     home = np.array([s.split("-") for s in stints["home_lineup"]])   # n x 5
     away = np.array([s.split("-") for s in stints["away_lineup"]])   # n x 5
     n = len(stints)

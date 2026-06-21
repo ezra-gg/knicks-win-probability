@@ -10,10 +10,6 @@ if [ ! -x "$ROOT/.venv/bin/python" ]; then
     exit 1
 fi
 
-# Default to pulling from the start of the modern era unless the caller
-# passes --start-season or --seasons explicitly.
-if [[ ! "$*" =~ --start-season ]] && [[ ! "$*" =~ --seasons ]]; then
-    set -- --start-season 2000-01 "$@"
-fi
-
+# The default start season (2000-01, the modern play-by-play era) lives in
+# src/ingest.py so there is a single source of truth; arguments pass through.
 exec "$ROOT/.venv/bin/python" "$ROOT/src/ingest.py" "$@"
