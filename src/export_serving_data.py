@@ -63,9 +63,9 @@ def main() -> None:
 
         # Per-play features for replay, holdout seasons only. Downsampled to the
         # last action in each ~10-second game-clock bucket: a win-probability
-        # curve is visually identical at that resolution, and it keeps this
-        # committed-and-refreshed file (and its daily git churn) several times
-        # smaller. Quarter boundaries and the final state are preserved.
+        # curve is visually identical at that resolution. Sorted so parquet's
+        # delta encoder can compress action_number and seconds_remaining.
+        # Quarter boundaries and the final state are preserved.
         con.execute(f"""
             COPY (
                 select * from int_model_input
@@ -74,6 +74,7 @@ def main() -> None:
                     partition by game_id, period, cast(seconds_remaining / 10 as integer)
                     order by action_number desc
                 ) = 1
+                order by game_id, period, action_number
             ) TO '{OUT_DIR / "replay.parquet"}' (FORMAT parquet)
         """)
 
