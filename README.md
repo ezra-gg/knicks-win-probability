@@ -1,4 +1,4 @@
-# 🏀 Knicks Win Probability
+# 🏀 NBA Win Probablity
 
 A win-probability model trained on historical NBA play-by-play data, with an
 interactive Streamlit app that lets you scrub through any game and watch the
