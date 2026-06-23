@@ -18,6 +18,12 @@ import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from live_feed import (  # noqa: E402
+    STATUS_LIVE,
+    action_game_state,
+    game_actions,
+    today_games,
+)
 from predict import (  # noqa: E402
     MatchupPredictor,
     endgame_certainty,
@@ -184,8 +190,8 @@ def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool,
 st.set_page_config(page_title="Knicks Win Probability", page_icon="🏀", layout="wide")
 st.title("🏀 Knicks Win Probability")
 
-overview_tab, odds_tab, replay_tab = st.tabs(
-    ["Overview", "Matchup Drill-Down", "Game Replay"])
+overview_tab, odds_tab, replay_tab, live_tab = st.tabs(
+    ["Overview", "Matchup Drill-Down", "Game Replay", "Live"])
 
 with odds_tab:
     st.caption("Pick two teams for the outright odds at tip-off. "
@@ -357,3 +363,117 @@ with replay_tab:
             f"**Final:** {name(away)} {int(g.away_pts)} - {int(g.home_pts)} {name(home)}  →  "
             f"**{name(winner)} won.**  Pre-game model: P({name(viewed_team)} win) = {p_curve.iloc[0]:.0%}"
         )
+
+with live_tab:
+    st.caption("Win probability updating in real time for any game currently in progress. "
+               "Refreshes every 30 seconds.")
+
+    @st.fragment(run_every=30)
+    def live_section() -> None:
+        try:
+            games = today_games()
+        except Exception as exc:
+            st.warning(f"Could not reach the NBA CDN: {exc}")
+            return
+
+        in_progress = [g for g in games if g["status"] == STATUS_LIVE]
+        if not in_progress:
+            other = [g for g in games if g["status"] != STATUS_LIVE]
+            if other:
+                labels = [f"{name(g['away'])} @ {name(g['home'])}" for g in other]
+                st.info("No games in progress right now.  Today's other games: "
+                        + ",  ".join(labels))
+            else:
+                st.info("No NBA games scheduled today.")
+            return
+
+        game_labels = {
+            g["game_id"]: f"{name(g['away'])} @ {name(g['home'])}"
+            for g in in_progress
+        }
+        selected_id = st.selectbox(
+            "Game", list(game_labels), format_func=lambda gid: game_labels[gid],
+            key="live_game_picker",
+        )
+        selected = next(g for g in in_progress if g["game_id"] == selected_id)
+        home, away = selected["home"], selected["away"]
+
+        try:
+            actions = game_actions(selected_id)
+        except Exception as exc:
+            st.warning(f"Could not fetch play-by-play: {exc}")
+            return
+
+        # Filter to actions that have a clock stamp and a score (skip
+        # administrative events at the top of the feed).
+        scored = [a for a in actions if a.get("clock") and a.get("scoreHome") is not None]
+        if not scored:
+            st.info("Waiting for the first scored play...")
+            return
+
+        predictor = get_predictor()
+        model, features = get_model()
+
+        rating_diff = predictor.ratings.get(home, 0) - predictor.ratings.get(away, 0)
+        home_rapm, home_box = predictor.roster_value.get(home, (None, None))
+        away_rapm, away_box = predictor.roster_value.get(away, (None, None))
+        roster_diff = (home_rapm - away_rapm
+                       if home_rapm is not None and away_rapm is not None else 0.0)
+        roster_box_diff = (home_box - away_box
+                           if home_box is not None and away_box is not None else 0.0)
+
+        rows = []
+        for a in scored:
+            state = action_game_state(a)
+            secs, is_ot = game_state_seconds(state["period"], state["clock_seconds"])
+            rows.append({
+                "seconds_remaining":     secs,
+                "score_diff":            state["score_diff"],
+                "is_overtime":           is_ot,
+                "is_playoff":            0,
+                "rating_diff":           rating_diff,
+                "roster_value_diff":     roster_diff,
+                "roster_value_box_diff": roster_box_diff,
+                "period":                state["period"],
+                "action_number":         int(a.get("actionNumber", 0)),
+            })
+        df = pd.DataFrame(rows)
+        df["p_home"] = model.predict_proba(df[features])[:, 1]
+        decided = [endgame_certainty(s, d)
+                   for s, d in zip(df["seconds_remaining"], df["score_diff"])]
+        df["p_home"] = [c if c is not None else p for c, p in zip(decided, df["p_home"])]
+        df["elapsed"] = [elapsed_seconds(p, s)
+                         for p, s in zip(df["period"], df["seconds_remaining"])]
+
+        perspective = st.radio(
+            "Show odds for", [name(home), name(away)],
+            horizontal=True, key="live_perspective",
+        )
+        show_home = perspective == name(home)
+        viewed = home if show_home else away
+        p_curve = df["p_home"] if show_home else 1 - df["p_home"]
+        latest_p = float(p_curve.iloc[-1])
+
+        m1, m2 = st.columns(2)
+        m1.metric(f"{name(home)} score", selected["home_score"])
+        m2.metric(f"{name(away)} score", selected["away_score"])
+        st.metric(f"P({name(viewed)} win)", f"{latest_p:.1%}")
+
+        tickvals, ticktext = quarter_ticks(df["period"].tolist())
+        fig = go.Figure()
+        fig.add_hline(y=0.5, line_dash="dot", line_color="gray")
+        for x in tickvals[1:]:
+            fig.add_vline(x=x, line_dash="dot", line_color="#e0e0e0")
+        fig.add_trace(go.Scatter(
+            x=df["elapsed"], y=p_curve, mode="lines",
+            line=dict(color="#F58426", width=2), name=f"P({viewed} win)",
+        ))
+        fig.update_layout(
+            yaxis=dict(title=f"Percent Chance of {name(viewed)} Winning",
+                       range=[0, 1], tickformat=".0%"),
+            xaxis=dict(title="Game progression", tickvals=tickvals, ticktext=ticktext),
+            height=440, margin=dict(t=30),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    live_section()
