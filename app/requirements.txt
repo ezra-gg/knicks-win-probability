@@ -10,3 +10,4 @@ pandas>=2.0
 pyarrow>=23.0.1      # pandas reads the serving parquet files; 23.0.1 floor clears a use-after-free advisory
 xgboost>=2.1.4
 scikit-learn>=1.6.1  # required by xgboost's sklearn-API model loader
+nba_api>=1.11.4      # live scoreboard and play-by-play for the Live tab
