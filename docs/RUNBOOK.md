@@ -14,9 +14,10 @@ ingest  ->  load  ->  ratings  ->  dbt build  ->  train  ->  export
 
 | Stage | Command | Produces | Rough time |
 | ----- | ------- | -------- | ---------- |
-| Ingest | `just ingest` | `data/raw/games.csv`, `data/raw/play_by_play.csv` | ~14h full history, seconds when incremental |
+| Ingest play-by-play | `just ingest` | `data/raw/games.csv`, `data/raw/play_by_play.csv` | ~14h full history, seconds when incremental |
+| Ingest box scores | `just ingest-boxscores` | `data/raw/boxscores.csv` | ~8h full history, seconds when incremental |
 | Load | `just load` | tables in `data/nba.duckdb` | seconds |
-| Ratings | `just ratings` | `data/team_ratings.parquet` + `team_ratings` table | seconds |
+| Ratings + lineups + RAPM | `just ratings`, `just lineups`, `just rapm` | Elo, lineup, and player-value tables | minutes |
 | Transform | `just dbt build` | staging/intermediate/mart models + tests | ~3s |
 | Train | `just train` | `models/win_probability.json` | ~50s |
 | Export | `just export` | `data/serving/` parquets (committed; the app reads these) | seconds |
@@ -57,7 +58,7 @@ Pulls the game index and per-game play-by-play from the public NBA stats API.
 Defaults to the 2000-01 season through the current one. It is **incremental**:
 re-running skips games already on disk, so it is safe to interrupt and resume.
 
-A full historical pull is ~31k games at roughly 1.6s each, so it warns and
+A full historical pull is ~33k games at roughly 1.6s each, so it warns and
 estimates the wall time before starting anything over five minutes. Run it
 detached and keep the Mac awake:
 

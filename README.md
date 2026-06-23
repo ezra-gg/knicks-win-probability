@@ -11,18 +11,20 @@ live probability curve. Knicks will always steal the spotlight though.
 
 Game results and play-by-play come from the public NBA stats API (via
 [`nba_api`](https://github.com/swar/nba_api)), land in a local DuckDB database,
-and feed a calibrated classifier. Given the score, time remaining, and period
-at any point in a game, the model estimates each team's chance of winning, and
-the Streamlit app replays that estimate across the whole game.
+and feed a calibrated XGBoost classifier. Given the score, time remaining, period,
+team Elo ratings, and current roster strength (learned RAPM + box-score Game Score),
+the model estimates each team's chance of winning. The Streamlit app replays that
+estimate across any historical game and tracks it live during games in progress.
 
 ## Try the app
 
 **[ezra-nba-probability.streamlit.app](https://ezra-nba-probability.streamlit.app/)** - no install needed.
 
-Three views: an **overview** (one team's tip-off odds against the whole league),
-a **matchup drill-down** (any two teams at any game state), and a **game replay**
+Four views: an **overview** (one team's tip-off odds against the whole league),
+a **matchup drill-down** (any two teams at any game state), a **game replay**
 (the win-probability curve through any historical game, plotted across the four
-quarters with a perspective toggle to follow either team's odds).
+quarters with a perspective toggle to follow either team's odds), and a **live**
+view (the curve updating in real time for any game currently in progress).
 
 To run locally instead:
 
@@ -67,40 +69,31 @@ fetches what's new, so it's safe to interrupt and resume.
 - [x] Model training and calibration (logistic baseline + XGBoost)
 - [x] Matchup predictor + Streamlit app (overview, matchup drill-down, game replay)
 - [x] Player-aware team strength (learned RAPM + box-score roster value)
-- [ ] Live game listener (stream an in-progress game, update the curve in real time)
+- [x] Live game listener (stream an in-progress game, update the curve in real time)
 
 See [docs/RUNBOOK.md](docs/RUNBOOK.md) to run the pipeline and
 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) to keep it healthy.
 
-## Down the road
+## How the model got built
 
-**Next up: a live game listener.** Poll an in-progress game from the NBA's live
-play-by-play feed, track the clock and score, and update the win-probability curve
-in real time - turning the game-replay view into a live scoreboard. The
-`MatchupPredictor` is already built to be called once per update; the listener is
-the piece that feeds it live state.
+Team Elo alone (BSS 0.387) can't react to a mid-season trade - it's a lagging,
+team-level signal. The model now also sees each team's **current roster**:
 
-### Shipped: player-aware team strength
-
-Team Elo is a lagging, team-level signal - it can't react to a mid-season trade
-until results pile up. So the model now also sees each team's **current roster**:
-
-1. **On-court lineups** are reconstructed from box-score starters + play-by-play
+1. **On-court lineups** reconstructed from box-score starters + play-by-play
    substitutions (`build_lineups.py`), validated to ~0.99 correlation against
    official box-score minutes.
 2. **Learned player value (RAPM)** - a ridge regression of stint point-margin on
    which ten players are on the floor (`build_rapm.py`), so a defender who never
    scores still earns credit. SGA and Giannis top the league, as they should.
 3. **Two roster-strength features** feed the model: the learned RAPM gap and a
-   box-score Game Score gap (they're complementary - RAPM is low-bias/noisy, Game
-   Score the reverse). Built from who actually appeared, so a traded player's value
+   box-score Game Score gap (complementary - RAPM is low-bias/noisy, Game Score
+   the reverse). Built from who actually appeared, so a traded player's value
    follows them automatically. Holdout BSS: **0.387 (Elo only) -> 0.413**.
 
-Each step was gated on evidence: a near-free box-score proxy validated the
-hypothesis before the expensive RAPM compute. See
-[MAINTENANCE.md](docs/MAINTENANCE.md) for the metrics.
+Each step was gated on evidence before the next was built. See
+[MAINTENANCE.md](docs/MAINTENANCE.md) for the full metrics.
 
-A few further directions, now that this works:
+## Further directions
 
 - **Validate RAPM** against the NBA's official player-tracking metrics (2013-14+),
   the same convergent-validity check used for Elo. A sanity test, not a feature.

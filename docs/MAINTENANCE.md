@@ -96,14 +96,14 @@ Both run locally via `just test` / `just dbt test`.
 
 ## CI
 
-Every pull request runs two checks (`.github/workflows/ci.yml`):
+Every pull request runs three checks (`.github/workflows/ci.yml`):
 
 - **lint** - `ruff check src/`
 - **dbt-parse** - validates the dbt project (refs, YAML, Jinja) without touching data
+- **pytest** - runs the unit test suite under `tests/`
 
-These are required to merge. They are fast because neither needs the database. If
-you add a stage that should gate merges (for example running `pytest`), add it as a
-new job there.
+All three are required to merge. Lint and dbt-parse are fast because neither needs
+the database. To add a new gate, add a job to the workflow file.
 
 ## Data quality belongs in dbt
 
