@@ -187,8 +187,8 @@ def field_matchups(predictor: MatchupPredictor, team: str, at_home: bool,
     return pd.DataFrame(odds)
 
 # --- layout ---------------------------------------------------------------
-st.set_page_config(page_title="Knicks Win Probability", page_icon="🏀", layout="wide")
-st.title("🏀 Knicks Win Probability")
+st.set_page_config(page_title="NBA Win Probability", page_icon="🏀", layout="wide")
+st.title("🏀 NBA Win Probability")
 
 overview_tab, odds_tab, replay_tab, live_tab = st.tabs(
     ["Overview", "Matchup Drill-Down", "Game Replay", "Live"])
